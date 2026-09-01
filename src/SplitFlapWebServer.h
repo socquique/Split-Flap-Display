@@ -25,6 +25,11 @@ class SplitFlapWebServer {
     void setTimezone();
     void checkRebootRequired();
 
+    // False until SNTP has answered. Right after boot time(nullptr) sits near
+    // the epoch, and showing that costs two full moves of every module: one to
+    // display a wrong time, another when the clock jumps to the real one.
+    bool isClockSynced() const;
+
     // Wifi Connectivity
     bool loadWiFiCredentials();
     bool connectToWifi();

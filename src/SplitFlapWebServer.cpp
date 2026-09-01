@@ -163,6 +163,12 @@ int SplitFlapWebServer::getMode() {
     return cachedMode;
 }
 
+bool SplitFlapWebServer::isClockSynced() const {
+    // 1700000000 is 2023-11-14, comfortably before any build of this firmware
+    // and far beyond anything an unsynchronised clock reports.
+    return time(nullptr) > 1700000000;
+}
+
 void SplitFlapWebServer::checkWiFi() {
     if (connectionMode != 1) {
         return;
@@ -397,6 +403,7 @@ void SplitFlapWebServer::startWebServer() {
         doc["firmware"] = FIRMWARE_VERSION;
         doc["name"] = settings.getString("name");
         doc["uptime_s"] = millis() / 1000;
+        doc["clock_synced"] = this->isClockSynced();
         doc["free_heap"] = ESP.getFreeHeap();
         doc["rssi"] = WiFi.RSSI();
         doc["mode"] = this->getMode();

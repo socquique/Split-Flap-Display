@@ -155,6 +155,13 @@ void dateMode() {
     if (millis() - webServer.getLastCheckDateTime() > webServer.getDateCheckInterval()) {
         webServer.setLastCheckDateTime(millis());
 
+        // Stay blank rather than confidently showing the wrong thing. Writing
+        // an unsynchronised clock to the drums means turning all eight modules
+        // to it and all eight again a minute later, once SNTP corrects it.
+        if (! webServer.isClockSynced()) {
+            return;
+        }
+
         String format = settings.getString("dateFormat");
         String strftimeFormat = convertToStrftime(format);
         String result = renderDate(strftimeFormat);
@@ -169,6 +176,13 @@ void dateMode() {
 void timeMode() {
     if (millis() - webServer.getLastCheckDateTime() > webServer.getDateCheckInterval()) {
         webServer.setLastCheckDateTime(millis());
+
+        // Stay blank rather than confidently showing the wrong thing. Writing
+        // an unsynchronised clock to the drums means turning all eight modules
+        // to it and all eight again a minute later, once SNTP corrects it.
+        if (! webServer.isClockSynced()) {
+            return;
+        }
 
         // Get user-friendly format from settings (fallback to "{HH}:{MM}")
         String userFormat =
