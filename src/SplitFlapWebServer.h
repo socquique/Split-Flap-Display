@@ -80,6 +80,12 @@ class SplitFlapWebServer {
     unsigned long lastCheckDateTime;
     SplitFlapDisplay *display = nullptr;
 
+    // Reconnect backoff. A wifi association needs seconds; retrying faster than
+    // that just aborts the attempt already in flight.
+    unsigned long wifiDownSince = 0;
+    unsigned long lastWifiRetry = 0;
+    unsigned long wifiRetryDelay = 0;
+
     int checkDateInterval;
 
     int connectionMode; // 0 is AP mode, 1 is Internet Mode

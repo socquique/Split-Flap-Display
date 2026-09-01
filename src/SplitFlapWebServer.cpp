@@ -154,12 +154,49 @@ int SplitFlapWebServer::getMode() {
 }
 
 void SplitFlapWebServer::checkWiFi() {
-    if (connectionMode == 1) {
-        if (WiFi.status() != WL_CONNECTED) {
-            Serial.println("Wi-Fi lost! Forcing reconnect...");
-            WiFi.disconnect();
-            WiFi.reconnect();
-        }
+    if (connectionMode != 1) {
+        return;
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+        wifiDownSince = 0;
+        wifiRetryDelay = 0;
+        return;
+    }
+
+    const unsigned long firstRetryDelay = 5000;
+    const unsigned long maxRetryDelay = 120000;
+    unsigned long now = millis();
+
+    // First time we notice: leave it alone. WiFi.setAutoReconnect(true) is
+    // already trying, and it needs several seconds to get through scan, auth,
+    // association and DHCP.
+    if (wifiDownSince == 0) {
+        Serial.println("Wi-Fi lost, waiting for auto-reconnect...");
+        wifiDownSince = now;
+        lastWifiRetry = now;
+        wifiRetryDelay = firstRetryDelay;
+        return;
+    }
+
+    if (now - lastWifiRetry < wifiRetryDelay) {
+        return;
+    }
+
+    // Forcing a reconnect tears down whatever attempt is in flight, so it has to
+    // be rarer than the time an attempt needs. The old code did it once a second
+    // and could keep a display from ever reconnecting at all.
+    Serial.print("Wi-Fi still down after ");
+    Serial.print((now - wifiDownSince) / 1000);
+    Serial.println("s, forcing reconnect");
+
+    WiFi.disconnect(false, false);
+    WiFi.reconnect();
+
+    lastWifiRetry = now;
+    wifiRetryDelay = wifiRetryDelay * 2;
+    if (wifiRetryDelay > maxRetryDelay) {
+        wifiRetryDelay = maxRetryDelay;
     }
 }
 
@@ -168,7 +205,8 @@ bool SplitFlapWebServer::loadWiFiCredentials() {
     String ssid = String(WIFI_SSID).isEmpty() ? settings.getString("ssid") : String(WIFI_SSID);
     String password = String(WIFI_PASS).isEmpty() ? settings.getString("password") : String(WIFI_PASS);
 
-    if (ssid != "" && password != "") {
+    // An open network has no password, so only the ssid can be required here.
+    if (ssid != "") {
         Serial.println("Wi-Fi credentials loaded successfully.");
         Serial.print("Connecting to Network: ");
         Serial.println(ssid);
@@ -177,7 +215,7 @@ bool SplitFlapWebServer::loadWiFiCredentials() {
         delay(100);
         WiFi.setTxPower((wifi_power_t) WIFI_TX_POWER);
 #endif
-        WiFi.begin(ssid.c_str(), password.c_str());
+        WiFi.begin(ssid.c_str(), password.length() > 0 ? password.c_str() : nullptr);
         return true; // Return true if credentials exist
     }
     return false;    // Return false if no credentials were found
