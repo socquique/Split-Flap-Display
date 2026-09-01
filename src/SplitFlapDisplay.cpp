@@ -83,6 +83,10 @@ void SplitFlapDisplay::init() {
 
     for (uint8_t i = 0; i < numModules; i++) {
         modules[i].init();
+        stepsSinceCorrection[i] = 0;
+        everCorrected[i] = false;
+        lastMagnetError[i] = 0;
+        lastMagnetTravel[i] = 0;
     }
 }
 
@@ -100,6 +104,12 @@ int SplitFlapDisplay::getDiagnostics(ModuleDiagnostics out[], int max) {
         out[i].stepsToMagnet =
             ((modules[i].getMagnetPosition() - modules[i].getPosition()) % stepsPerRot + stepsPerRot) % stepsPerRot;
         out[i].errored = modules[i].getHasErrored();
+        out[i].magnetError = lastMagnetError[i];
+        out[i].magnetTravel = lastMagnetTravel[i];
+        // A reading only means something when the module covered close to one
+        // full revolution between corrections; anything else is not comparable.
+        out[i].magnetErrorValid = lastMagnetTravel[i] > (stepsPerRot * 3) / 4 &&
+            lastMagnetTravel[i] < (stepsPerRot * 5) / 4;
         out[i].hall = haveBus ? (modules[i].readHallEffectSensor() ? 1 : 0) : -1;
     }
 
@@ -342,10 +352,6 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
     // correction at a point where the drum is no longer at magnetPosition - the
     // bouncing the 20ms interval was there to hide.
     const int rearmAfter = stepsPerRot / 4;
-    int stepsSinceCorrection[numModules];
-    for (int i = 0; i < numModules; i++) {
-        stepsSinceCorrection[i] = stepsPerRot;
-    }
 
     auto nearMagnet = [&](int i) {
         int forward = ((modules[i].getMagnetPosition() - modules[i].getPosition()) % stepsPerRot + stepsPerRot) %
@@ -357,8 +363,20 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
     auto pollMagnet = [&](int i) {
         if (modules[i].readHallEffectSensor()) {
             if (! resetLatches[i] && stepsSinceCorrection[i] >= rearmAfter) {
-                modules[i].magnetDetected(); // update position to the modules magnet position
+                // How far off we were before trusting the magnet again. Kept for
+                // /diag: measured over a full revolution it is exactly the error
+                // in stepsPerRot.
+                if (everCorrected[i]) {
+                    int raw =
+                        ((modules[i].getPosition() - modules[i].getMagnetPosition()) % stepsPerRot + stepsPerRot) %
+                        stepsPerRot;
+                    lastMagnetError[i] = (raw > stepsPerRot / 2) ? raw - stepsPerRot : raw;
+                    lastMagnetTravel[i] = stepsSinceCorrection[i];
+                }
+                everCorrected[i] = true;
                 stepsSinceCorrection[i] = 0;
+
+                modules[i].magnetDetected(); // update position to the modules magnet position
 
                 // re-derive what is left to turn from the corrected position
                 stepsRemaining[i] = (targetPositions[i] - modules[i].getPosition() + stepsPerRot) % stepsPerRot;
@@ -379,7 +397,7 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
             if (((currentTime - lastStepTimes[i]) > stepPeriodUs) && stepsRemaining[i] > 0) {
                 modules[i].step();
                 stepsRemaining[i]--;
-                if (stepsSinceCorrection[i] < stepsPerRot) {
+                if (stepsSinceCorrection[i] < 100 * stepsPerRot) {
                     stepsSinceCorrection[i]++;
                 }
 

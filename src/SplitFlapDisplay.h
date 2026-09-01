@@ -23,6 +23,14 @@ struct ModuleDiagnostics
     int stepsToMagnet;
     int hall;
     bool errored;
+
+    // Steps between where the module thought it was and where its magnet says
+    // it is, measured at the last correction. Over one revolution this is the
+    // accumulated error, so it says directly whether stepsPerRot is right:
+    // a reading of -14 means the configured value is 14 steps too high.
+    int magnetError;
+    int magnetTravel;
+    bool magnetErrorValid;
 };
 
 class SplitFlapDisplay {
@@ -91,4 +99,12 @@ class SplitFlapDisplay {
     // hall sensor, and gives up rather than stalling an HTTP request behind a
     // full revolution.
     SemaphoreHandle_t busMutex = nullptr;
+
+    // Travel since each module last trusted its magnet. Persisted across moves:
+    // a module only meets its magnet once per revolution, and in clock mode that
+    // takes many separate moves to accumulate.
+    int stepsSinceCorrection[MAX_MODULES] = {};
+    bool everCorrected[MAX_MODULES] = {};
+    int lastMagnetError[MAX_MODULES] = {};
+    int lastMagnetTravel[MAX_MODULES] = {};
 };

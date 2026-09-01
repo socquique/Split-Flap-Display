@@ -434,6 +434,16 @@ void SplitFlapWebServer::startWebServer() {
                 entry["stepsToMagnet"] = diags[i].stepsToMagnet;
                 entry["errored"] = diags[i].errored;
 
+                // Only meaningful when the module travelled a whole revolution
+                // between corrections; a shorter hop measures nothing useful.
+                if (diags[i].magnetErrorValid) {
+                    entry["magnetError"] = diags[i].magnetError;
+                    entry["magnetTravel"] = diags[i].magnetTravel;
+                    entry["suggestedStepsPerRot"] = stepsPerRot + diags[i].magnetError;
+                } else {
+                    entry["magnetError"] = nullptr;
+                }
+
                 if (diags[i].hall < 0) {
                     entry["hall"] = nullptr; // bus was busy, we did not read it
                 } else {
