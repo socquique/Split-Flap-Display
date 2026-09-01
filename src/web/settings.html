@@ -577,7 +577,7 @@
             <div class="grid grid-cols-4 md:grid-cols-8 gap-2 mt-2 w-full">
                 <template
                     x-for="(val, i) in Array.from({ length: settings.moduleCount })"
-                    :key="`addr-${i}-${addressArray[i]}`"
+                    :key="`addr-${i}`"
                 >
                     <input
                         type="number"
@@ -599,7 +599,7 @@
             <div class="grid grid-cols-4 md:grid-cols-8 gap-2 mt-2 w-full">
                 <template
                     x-for="(val, i) in Array.from({ length: settings.moduleCount })"
-                    :key="`off-${i}-${offsetArray[i]}`"
+                    :key="`off-${i}`"
                 >
                     <input
                         type="number"
