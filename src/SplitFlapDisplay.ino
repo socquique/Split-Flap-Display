@@ -17,18 +17,18 @@ JsonSettings settings = JsonSettings("config", {
     // General Settings
     {"name", JsonSetting("My Display")},
     {"mdns", JsonSetting("splitflap")},
-    {"otaPass", JsonSetting("")},
+    {"otaPass", JsonSetting("").asSecret()},
     {"timezone", JsonSetting("UTC0")},
     {"dateFormat", JsonSetting("{dd}-{mm}-{yy}")},
     {"timeFormat", JsonSetting("{HH}:{MM}")},
     // Wifi Settings
     {"ssid", JsonSetting("")},
-    {"password", JsonSetting("")},
+    {"password", JsonSetting("").asSecret()},
     // MQTT Settings
     {"mqtt_server", JsonSetting("")},
     {"mqtt_port", JsonSetting(1883, 1, 65535)},
     {"mqtt_user", JsonSetting("")},
-    {"mqtt_pass", JsonSetting("")},
+    {"mqtt_pass", JsonSetting("").asSecret()},
     // Hardware Settings
     {"moduleCount", JsonSetting(8, 1, MAX_MODULES)},
     {"moduleAddresses", JsonSetting({0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27})},
@@ -42,7 +42,14 @@ JsonSettings settings = JsonSettings("config", {
     {"charset", JsonSetting(48, 37, 48)},
     {"custom_charset", JsonSetting(" ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789':?!.-/@$#%")},
     // Operational States
-    {"mode", JsonSetting(0, 0, 6)}
+    {"mode", JsonSetting(0, 0, 6)},
+    // What Custom Text mode should show. The mode itself was already persisted
+    // while the text was not, so a display came back from a power cut in text
+    // mode with nothing to say.
+    {"inputText", JsonSetting("")},
+    {"multiText", JsonSetting("")},
+    {"multiDelay", JsonSetting(1, 1, 3600)},
+    {"centerText", JsonSetting(0, 0, 1)}
 });
 // clang-format on
 
@@ -105,6 +112,10 @@ void setup() {
 void loop() {
     splitflapMqtt.loop();
 
+    if (webServer.takeHomeRequest()) {
+        display.home();
+    }
+
     // check what mode the display is in, this value is updated by the web server
     switch (webServer.getMode()) {
         case 0: singleInputMode(); break;
@@ -138,6 +149,10 @@ void singleInputMode() {
 }
 
 void multiInputMode() {
+    if (webServer.getNumMultiWords() <= 0) {
+        return; // nothing configured; the modulo below would divide by zero
+    }
+
     if (millis() - webServer.getLastSwitchMultiTime() > webServer.getMultiWordDelay()) {
         // get user input, extract correct word from index using webserver counter, and display
         String userInput = webServer.getMultiInputString();

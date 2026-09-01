@@ -21,8 +21,18 @@ class SplitFlapWebServer {
   public:
     SplitFlapWebServer(JsonSettings &settings);
     void setDisplay(SplitFlapDisplay *displayHandler) { display = displayHandler; }
+
+    // home() blocks for the best part of a minute, so the request is queued here
+    // and run from loop(). Doing it on the web server task would stall every
+    // other request behind it.
+    bool takeHomeRequest() {
+        bool requested = homeRequested;
+        homeRequested = false;
+        return requested;
+    }
     void init();
     void setTimezone();
+    void restoreTextState();
     void checkRebootRequired();
 
     // False until SNTP has answered. Right after boot time(nullptr) sits near
@@ -88,6 +98,7 @@ class SplitFlapWebServer {
 
     unsigned long lastCheckDateTime;
     SplitFlapDisplay *display = nullptr;
+    bool homeRequested = false;
 
     int cachedMode = 0;
     unsigned long modeCacheTime = 0;

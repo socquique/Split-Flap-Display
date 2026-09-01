@@ -35,6 +35,13 @@ class JsonSetting {
         strDefault = intVectorToString(intVectorDefault);
     }
 
+    // Marks a value that must never leave the device. Chainable so the settings
+    // map reads as documentation: JsonSetting("").asSecret()
+    JsonSetting &asSecret() {
+        isSecret = true;
+        return *this;
+    }
+
     bool validate(String str);
     String getLastValidationError() { return lastValidationError; }
 
@@ -51,6 +58,7 @@ class JsonSetting {
     float floatMin = 0.0f;
     float floatMax = 0.0f;
     bool hasRange = false;
+    bool isSecret = false;
 
     String intVectorToString(const std::vector<int> &vec);
 

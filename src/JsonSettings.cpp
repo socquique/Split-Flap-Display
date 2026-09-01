@@ -106,9 +106,21 @@ JsonDocument JsonSettings::toJson() {
 
     preferences.begin(name, true);
 
+    JsonDocument configured;
+
     for (const auto &pair : map) {
         const String &key = pair.first;
         const JsonSetting &setting = pair.second;
+
+        // Anything served here is readable by every device on the network, with
+        // no authentication in front of it. A wifi password handed out that way
+        // turns "someone is on the network" into "someone has the keys to it".
+        // Report only whether each secret is set.
+        if (setting.isSecret) {
+            settings[key] = "";
+            configured[key] = preferences.getString(key.c_str(), setting.strDefault).length() > 0;
+            continue;
+        }
 
         switch (setting.type) {
             case JsonSettingType::JST_STR:
@@ -123,6 +135,9 @@ JsonDocument JsonSettings::toJson() {
     }
 
     preferences.end();
+
+    settings["secretsSet"] = configured;
+
     return settings;
 }
 
@@ -166,6 +181,12 @@ bool JsonSettings::fromJson(JsonDocument settings) {
         }
 
         JsonSetting setting = this->find(key);
+
+        // The page never receives secrets, so it posts them back empty unless
+        // the user typed a new one. Empty means "leave it alone", not "clear it".
+        if (setting.isSecret && kv.value().as<String>().length() == 0) {
+            continue;
+        }
 
         switch (setting.type) {
             case JsonSettingType::JST_INT_VECTOR:

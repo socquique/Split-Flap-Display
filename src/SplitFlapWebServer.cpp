@@ -28,7 +28,27 @@ void SplitFlapWebServer::init() {
         return;
     }
 
+    restoreTextState();
     setTimezone();
+}
+
+// The mode survives a restart in NVS but the text it refers to used to live only
+// in RAM, so a display in Custom Text mode came back blank and stayed blank.
+void SplitFlapWebServer::restoreTextState() {
+    inputString = settings.getString("inputText");
+    multiInputString = settings.getString("multiText");
+    centering = settings.getInt("centerText");
+    multiWordDelay = settings.getInt("multiDelay") * 1000;
+
+    numMultiWords = 0;
+    if (multiInputString.length() > 0) {
+        numMultiWords = 1;
+        for (unsigned int i = 0; i < multiInputString.length(); i++) {
+            if (multiInputString[i] == ',') {
+                numMultiWords++;
+            }
+        }
+    }
 }
 
 void SplitFlapWebServer::setTimezone() {
@@ -502,6 +522,18 @@ void SplitFlapWebServer::startWebServer() {
         request->send(200, "application/json", body);
     });
 
+    // Re-home every module. Until now the only way to recover a module that had
+    // lost its place was to cut the power.
+    server.on("/home", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        this->homeRequested = true;
+        this->writtenString = ""; // force the current mode to redraw afterwards
+
+        JsonDocument response;
+        response["message"] = "Homing all modules...";
+        response["type"] = "success";
+        request->send(200, "application/json", response.as<String>());
+    });
+
     server.on("/settings/reset", HTTP_POST, [this](AsyncWebServerRequest *request) {
         settings.reset();
 
@@ -623,15 +655,18 @@ void SplitFlapWebServer::startWebServer() {
         }
 
         this->setMultiDelay(delay * 1000);
+        settings.putInt("multiDelay", (int) delay);
         Serial.println("Delay: " + String(this->getMultiWordDelay()));
 
         centering = json["center"].as<bool>() ? 1 : 0;
+        settings.putInt("centerText", centering);
         Serial.println("centering: " + String(centering ? "true" : "false"));
 
         if (json["mode"] == "single") {
             String word = decodeURIComponent(json["words"][0].as<String>());
             Serial.println("Single Word: " + word);
             this->setInputString(word);
+            settings.putString("inputText", word);
             this->setMode(0); // change mode last once all variables updated
         }
 
@@ -646,6 +681,7 @@ void SplitFlapWebServer::startWebServer() {
             }
 
             this->setMultiInputString(words);
+            settings.putString("multiText", words);
             this->numMultiWords = wordsArray.size();
             Serial.println("Multiple Words: " + words);
             Serial.println("Number of Words: " + String(this->numMultiWords));

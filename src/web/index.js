@@ -95,6 +95,17 @@ document.addEventListener("alpine:init", () => {
             return h > 0 ? `${h}h ${m}m` : `${m}m ${total % 60}s`;
         },
 
+        homing: false,
+
+        home() {
+            this.homing = true;
+            fetch("/home", { method: "POST" })
+                .then((r) => r.json())
+                .then((d) => this.showDialog(d.message, d.type))
+                .catch(() => this.showDialog("Could not reach the display.", "error"))
+                .finally(() => (this.homing = false));
+        },
+
         loadDiag() {
             fetch("/diag")
                 .then((r) => r.json())

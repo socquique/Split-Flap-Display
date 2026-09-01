@@ -168,11 +168,20 @@
                 Update Display
             </button>
 
-            <a
-                href="settings.html"
-                class="p-3 mt-4 text-lg font-semibold text-white hover:text-amber-600 text-center block transition-colors"
-                >Settings</a
-            >
+            <div class="flex items-center justify-center gap-6 w-full mt-4">
+                <a
+                    href="settings.html"
+                    class="p-3 text-lg font-semibold text-white hover:text-amber-600 text-center transition-colors"
+                    >Settings</a
+                >
+                <button
+                    class="p-3 text-lg font-semibold text-neutral-400 hover:text-amber-600 transition-colors disabled:opacity-40"
+                    :disabled="homing"
+                    x-on:click="home()"
+                    x-text="homing ? 'Homing...' : 'Re-home'"
+                    title="Turn every module to its magnet and back to the current text"
+                ></button>
+            </div>
         </div>
 
         <!--
