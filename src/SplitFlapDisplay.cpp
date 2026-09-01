@@ -289,6 +289,48 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
 
     delay(startStopDelay); // give the motor time to align to magnetic field
 
+    // How close a module has to be to its magnet before we stop waiting for the
+    // 20ms sweep and read its sensor after every single step. At 10 RPM a step
+    // is ~2.9ms, so the sweep alone only tells us where the magnet edge was to
+    // within ~7 steps - a sixth of a flap on a 48 flap drum, and biased late,
+    // because it can only ever notice the edge after the fact. Polling finely
+    // near the magnet costs one extra i2c read per step for the one or two
+    // modules currently in their window.
+    const int magnetWindow = stepsPerRot / 24;
+
+    // Once a module has been corrected, ignore its sensor until it has actually
+    // travelled somewhere. Reading every step would otherwise let a single
+    // flicker part way through the (physically wide) magnet window re-trigger a
+    // correction at a point where the drum is no longer at magnetPosition - the
+    // bouncing the 20ms interval was there to hide.
+    const int rearmAfter = stepsPerRot / 4;
+    int stepsSinceCorrection[numModules];
+    for (int i = 0; i < numModules; i++) {
+        stepsSinceCorrection[i] = stepsPerRot;
+    }
+
+    auto nearMagnet = [&](int i) {
+        int forward = ((modules[i].getMagnetPosition() - modules[i].getPosition()) % stepsPerRot + stepsPerRot) %
+            stepsPerRot;
+        int delta = (forward > stepsPerRot / 2) ? forward - stepsPerRot : forward;
+        return delta >= -magnetWindow && delta <= magnetWindow;
+    };
+
+    auto pollMagnet = [&](int i) {
+        if (modules[i].readHallEffectSensor()) {
+            if (! resetLatches[i] && stepsSinceCorrection[i] >= rearmAfter) {
+                modules[i].magnetDetected(); // update position to the modules magnet position
+                stepsSinceCorrection[i] = 0;
+
+                // re-derive what is left to turn from the corrected position
+                stepsRemaining[i] = (targetPositions[i] - modules[i].getPosition() + stepsPerRot) % stepsPerRot;
+                resetLatches[i] = true;
+            }
+        } else if (resetLatches[i]) {
+            resetLatches[i] = false;
+        }
+    };
+
     bool isFinished = false;
     while (! isFinished) {
         currentTime = micros();
@@ -296,38 +338,25 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
             if (((currentTime - lastStepTimes[i]) > timePerStep) && stepsRemaining[i] > 0) {
                 modules[i].step();
                 stepsRemaining[i]--;
+                if (stepsSinceCorrection[i] < stepsPerRot) {
+                    stepsSinceCorrection[i]++;
+                }
                 lastStepTimes[i] = micros();
+
+                // Read this module's sensor right now if it is passing its
+                // magnet, rather than waiting for the next sweep.
+                if (stepsRemaining[i] > 0 && nearMagnet(i)) {
+                    pollMagnet(i);
+                }
             }
         }
 
-        if ((currentTime - lastSensorCheckTime) > checkIntervalUs) { // check hall effect sensor every checkIntervalMs
-            // check every modules sensor
+        // The coarse sweep stays as the safety net: a module whose position has
+        // drifted far enough never enters its window, and this is what finds it.
+        if ((currentTime - lastSensorCheckTime) > checkIntervalUs) {
             for (int i = 0; i < numModules; i++) {
-                if (stepsRemaining[i] > 0 &&
-                    (modules[i].readHallEffectSensor() == true
-                    )) { // only check sensors where the module is still moving
-                    if (! resetLatches[i]) {
-                        // UNCOMMENTING THIS WILL PROBBALY MAKE THE MOTORS INACCURATE, DUE
-                        // TO TIME TAKEN TO PRINT
-                        //  Serial.print("Module: ");
-                        //  Serial.print(i);
-                        //  Serial.print(" Magnet Position: ");
-                        //  Serial.print(modules[i].getMagnetPosition());
-                        //  Serial.print(" Actual Position: ");
-                        //  Serial.print(modules[i].getPosition());
-                        //  Serial.print(" Error: ");
-                        //  Serial.println((modules[i].getMagnetPosition() -
-                        //  modules[i].getPosition()));
-                        modules[i].magnetDetected(); // update position to the modules
-                        // magnet position
-
-                        // re-derive what is left to turn from the corrected position
-                        stepsRemaining[i] =
-                            (targetPositions[i] - modules[i].getPosition() + stepsPerRot) % stepsPerRot;
-                        resetLatches[i] = true;
-                    }
-                } else if (resetLatches[i] == true) {
-                    resetLatches[i] = false;
+                if (stepsRemaining[i] > 0 && ! nearMagnet(i)) {
+                    pollMagnet(i);
                 }
             }
             lastSensorCheckTime = currentTime; // recall micros because for loop may
