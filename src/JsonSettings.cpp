@@ -131,6 +131,9 @@ bool JsonSettings::fromJson(JsonDocument settings) {
 
     preferences.begin(name, false);
 
+    // Validate everything before storing anything. Doing both in one pass meant
+    // a body whose last field was rejected still committed all the fields
+    // before it, leaving the device half configured behind an error message.
     for (JsonPair kv : settings.as<JsonObject>()) {
         const char *key = kv.key().c_str();
 
@@ -153,6 +156,16 @@ bool JsonSettings::fromJson(JsonDocument settings) {
             preferences.end(); // do not leak the nvs handle on the error path
             return false;
         }
+    }
+
+    for (JsonPair kv : settings.as<JsonObject>()) {
+        const char *key = kv.key().c_str();
+
+        if (this->map.find(key) == this->map.end()) {
+            continue;
+        }
+
+        JsonSetting setting = this->find(key);
 
         switch (setting.type) {
             case JsonSettingType::JST_INT_VECTOR:

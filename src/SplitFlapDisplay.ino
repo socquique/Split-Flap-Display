@@ -26,23 +26,23 @@ JsonSettings settings = JsonSettings("config", {
     {"password", JsonSetting("")},
     // MQTT Settings
     {"mqtt_server", JsonSetting("")},
-    {"mqtt_port", JsonSetting(1883)},
+    {"mqtt_port", JsonSetting(1883, 1, 65535)},
     {"mqtt_user", JsonSetting("")},
     {"mqtt_pass", JsonSetting("")},
     // Hardware Settings
-    {"moduleCount", JsonSetting(8)},
+    {"moduleCount", JsonSetting(8, 1, MAX_MODULES)},
     {"moduleAddresses", JsonSetting({0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27})},
-    {"magnetPosition", JsonSetting(730)},
+    {"magnetPosition", JsonSetting(730, 0, 20000)},
     {"moduleOffsets", JsonSetting({0, 0, 0, 0, 0, 0, 0, 0})},
-    {"displayOffset", JsonSetting(0)},
-    {"sdaPin", JsonSetting(8)},
-    {"sclPin", JsonSetting(9)},
-    {"stepsPerRot", JsonSetting(2048)},
-    {"maxVel", JsonSetting(15.0f)},
-    {"charset", JsonSetting(48)},
+    {"displayOffset", JsonSetting(0, -20000, 20000)},
+    {"sdaPin", JsonSetting(8, 0, 48)},
+    {"sclPin", JsonSetting(9, 0, 48)},
+    {"stepsPerRot", JsonSetting(2048, 100, 20000)},
+    {"maxVel", JsonSetting(15.0f, 0.5f, 30.0f)},
+    {"charset", JsonSetting(48, 37, 48)},
     {"custom_charset", JsonSetting(" ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789':?!.-/@$#%")},
     // Operational States
-    {"mode", JsonSetting(0)}
+    {"mode", JsonSetting(0, 0, 6)}
 });
 // clang-format on
 
