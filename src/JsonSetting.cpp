@@ -65,8 +65,6 @@ bool JsonSetting::validateIntVector(String str) {
     // check only looked at the character set, so "1-2-3" and "---" passed.
     size_t i = 0;
     while (i < str.length()) {
-        size_t fieldStart = i;
-
         if (str[i] == '-') {
             i++;
         }
@@ -97,8 +95,6 @@ bool JsonSetting::validateIntVector(String str) {
             lastValidationError = "Trailing comma";
             return false;
         }
-
-        (void) fieldStart;
     }
 
     return true;

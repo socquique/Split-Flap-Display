@@ -284,6 +284,12 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
 
     bool anyMoving = false;
 
+    // Own the i2c bus for the whole move, starting before the first coil write:
+    // the web server task must not interleave a hall read between any of them.
+    if (busMutex != nullptr) {
+        xSemaphoreTake(busMutex, portMAX_DELAY);
+    }
+
     for (int i = 0; i < numModules; i++) {
         targetPositions[i] = constrain(
             targetPositions[i],
@@ -313,13 +319,10 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
         if (releaseMotors) {
             stopMotors();
         }
+        if (busMutex != nullptr) {
+            xSemaphoreGive(busMutex);
+        }
         return;
-    }
-
-    // Own the i2c bus for the whole move: the web server task must not
-    // interleave a hall read between our coil writes.
-    if (busMutex != nullptr) {
-        xSemaphoreTake(busMutex, portMAX_DELAY);
     }
 
     delay(startStopDelay); // give the motor time to align to magnetic field
@@ -432,13 +435,13 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
         }
     }
 
-    if (busMutex != nullptr) {
-        xSemaphoreGive(busMutex);
-    }
-
     if (releaseMotors) {
         delay(startStopDelay); // allow all motors time to settle
         stopMotors();
+    }
+
+    if (busMutex != nullptr) {
+        xSemaphoreGive(busMutex);
     }
 }
 
