@@ -269,7 +269,7 @@
                         type="password"
                         id="password"
                         x-model="settings.password"
-                        placeholder="WiFi Password"
+                        :placeholder="settings.secretsSet?.password ? 'Stored — type to replace' : 'WiFi Password'"
                     />
                     <div
                         class="w-full p-3 mt-2 text-sm text-white bg-red-700 rounded-md"
@@ -325,7 +325,7 @@
                     type="password"
                     id="otaPass"
                     x-model="settings.otaPass"
-                    placeholder="Enter OTA Password"
+                    :placeholder="settings.secretsSet?.otaPass ? 'Stored — type to replace' : 'Not set: OTA is disabled'"
                 />
                 <div
                     class="w-full p-3 mt-2 text-sm text-white bg-red-700 rounded-md"
@@ -434,7 +434,7 @@
                         type="password"
                         id="mqtt_pass"
                         x-model="settings.mqtt_pass"
-                        placeholder="optional"
+                        :placeholder="settings.secretsSet?.mqtt_pass ? 'Stored — type to replace' : 'optional'"
                     />
                 </div>
             </div>

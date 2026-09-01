@@ -98,7 +98,10 @@ class SplitFlapWebServer {
 
     unsigned long lastCheckDateTime;
     SplitFlapDisplay *display = nullptr;
-    bool homeRequested = false;
+    // Written on the web server task, read and cleared on the Arduino loop task.
+    // volatile so the read in loop() is not cached away; losing a request to the
+    // non-atomic read-then-clear would only mean pressing the button again.
+    volatile bool homeRequested = false;
 
     int cachedMode = 0;
     unsigned long modeCacheTime = 0;
