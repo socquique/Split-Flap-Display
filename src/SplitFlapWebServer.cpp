@@ -147,10 +147,20 @@ String SplitFlapWebServer::getCurrentDay() {
 
 void SplitFlapWebServer::setMode(int targetMode) {
     settings.putInt("mode", targetMode);
+    cachedMode = targetMode;
+    modeCacheTime = millis();
 }
 
 int SplitFlapWebServer::getMode() {
-    return settings.getInt("mode");
+    // loop() asks for this on every pass, and each call used to open and close
+    // NVS. A tenth of a second of staleness is invisible next to a display that
+    // takes seconds to turn.
+    unsigned long now = millis();
+    if (modeCacheTime == 0 || now - modeCacheTime >= 100) {
+        cachedMode = settings.getInt("mode");
+        modeCacheTime = now;
+    }
+    return cachedMode;
 }
 
 void SplitFlapWebServer::checkWiFi() {
@@ -242,7 +252,7 @@ void SplitFlapWebServer::enableOta() {
     ArduinoOTA.setPassword(settings.getString("otaPass").c_str());
 
     ArduinoOTA
-        .onStart([]() {
+        .onStart([this]() {
         String type;
         if (ArduinoOTA.getCommand() == U_FLASH) {
             type = "sketch";
@@ -250,6 +260,14 @@ void SplitFlapWebServer::enableOta() {
             type = "filesystem";
             LittleFS.end(); // Unmount the filesystem before update
         }
+
+        // An update takes tens of seconds, and it can start while a move is in
+        // progress - moveTo() services OTA from inside its loop. Without this
+        // the coils stay powered for the whole transfer.
+        if (display != nullptr) {
+            display->releaseMotorsNow();
+        }
+
         Serial.println("Start updating " + type);
     })
         .onEnd([]() {

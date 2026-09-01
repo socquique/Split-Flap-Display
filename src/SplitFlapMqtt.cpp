@@ -31,6 +31,13 @@ void SplitFlapMqtt::setup() {
         }
     });
 
+    if (mqttServer.length() == 0) {
+        Serial.println("[MQTT] No broker configured, staying offline");
+        return;
+    }
+
+    retryCount = 0;
+    lastAttempt = 0;
     connectToMqtt();
 }
 
@@ -40,10 +47,16 @@ void SplitFlapMqtt::connectToMqtt() {
         String mdns = settings.getString("mdns");
         String name = settings.getString("name");
 
+        // Register a last will so the broker announces us offline if we drop
+        // without saying goodbye. Publishing "online" retained with no will
+        // leaves Home Assistant showing the display as available forever after
+        // it loses power.
         if (mqttUser.length() > 0) {
-            mqttClient.connect(mdns.c_str(), mqttUser.c_str(), mqttPass.c_str());
+            mqttClient.connect(
+                mdns.c_str(), mqttUser.c_str(), mqttPass.c_str(), topic_avail.c_str(), 0, true, "offline"
+            );
         } else {
-            mqttClient.connect(mdns.c_str());
+            mqttClient.connect(mdns.c_str(), topic_avail.c_str(), 0, true, "offline");
         }
 
         if (mqttClient.connected()) {
@@ -102,7 +115,39 @@ void SplitFlapMqtt::publishState(const String &message) {
 }
 
 void SplitFlapMqtt::loop() {
-    mqttClient.loop();
+    if (mqttServer.length() == 0) {
+        return; // no broker configured
+    }
+
+    if (mqttClient.connected()) {
+        retryCount = 0;
+        mqttClient.loop();
+        return;
+    }
+
+    // connectToMqtt() used to be called only from setup(), so a broker that went
+    // away was never reconnected to: the display stayed silent until it was
+    // power cycled. Retry with a backoff instead, since each attempt blocks on a
+    // tcp connect and a broker that is down tends to stay down for a while.
+    const unsigned long baseDelay = 5000;
+    const unsigned long maxDelay = 120000;
+
+    unsigned long delayMs = baseDelay << (retryCount > 5 ? 5 : retryCount);
+    if (delayMs > maxDelay) {
+        delayMs = maxDelay;
+    }
+
+    unsigned long now = millis();
+    if (lastAttempt != 0 && now - lastAttempt < delayMs) {
+        return;
+    }
+
+    lastAttempt = now;
+    connectToMqtt();
+
+    if (! mqttClient.connected() && retryCount < 5) {
+        retryCount++;
+    }
 }
 
 bool SplitFlapMqtt::isConnected() {

@@ -56,6 +56,8 @@ class SplitFlapDisplay {
     // else has to keep running - OTA, chiefly.
     void setIdleCallback(std::function<void()> callback) { idleCallback = callback; }
 
+    void releaseMotorsNow(); // de-energize every coil immediately (OTA is starting)
+
     int getStepsPerRot() const { return stepsPerRot; }
     int getDiagnostics(ModuleDiagnostics out[], int max);
 

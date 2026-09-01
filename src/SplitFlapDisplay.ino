@@ -113,6 +113,10 @@ void loop() {
         case 3: timeMode(); break;
         case 4: break;
         case 5: randomTest(); break;
+        // The web page uses 6 for Custom Text and then POSTs /text, which
+        // rewrites the mode to 0 or 1. Saving settings while that option is
+        // selected leaves 6 stored, and the display then did nothing at all.
+        case 6: singleInputMode(); break;
         default: break;
     }
 
@@ -244,7 +248,13 @@ String renderDate(const String &format) {
     time_t now = time(nullptr);
     struct tm *timeinfo = localtime(&now);
 
-    strftime(buf, sizeof(buf), format.c_str(), timeinfo);
+    // {d} is documented in the settings help but has no strftime equivalent
+    // newlib supports - %-d is a glibc extension. Substitute it here, where the
+    // tm is already to hand. {dd}, {ddd} and {dddd} were consumed earlier.
+    String resolved = format;
+    resolved.replace("{d}", String(timeinfo->tm_mday));
+
+    strftime(buf, sizeof(buf), resolved.c_str(), timeinfo);
 
     return trimToModuleCount(String(buf), display.getNumModules());
 }
@@ -254,7 +264,13 @@ String renderTime(const String &format) {
     time_t now = time(nullptr);
     struct tm *timeinfo = localtime(&now);
 
-    strftime(buf, sizeof(buf), format.c_str(), timeinfo);
+    // {d} is documented in the settings help but has no strftime equivalent
+    // newlib supports - %-d is a glibc extension. Substitute it here, where the
+    // tm is already to hand. {dd}, {ddd} and {dddd} were consumed earlier.
+    String resolved = format;
+    resolved.replace("{d}", String(timeinfo->tm_mday));
+
+    strftime(buf, sizeof(buf), resolved.c_str(), timeinfo);
 
     return trimToModuleCount(String(buf), display.getNumModules());
 }
@@ -286,7 +302,9 @@ String convertToStrftime(String userFormat) {
         // Time formats
         {"{HH}", "%H"},   // Hours (24-hour clock, 00–23)
         {"{hh}", "%I"},   // Hours (12-hour clock, 01–12)
-        {"{MM}", "%M"},   // Minutes (00–59)
+        {"{min}", "%M"},  // Minutes, unambiguous alias
+        {"{sec}", "%S"},  // Seconds, unambiguous alias
+        {"{MM}", "%M"},   // Minutes (00-59). NB: {mm} is the MONTH, as in strftime
         {"{SS}", "%S"},   // Seconds (00-59)
         {"{AMPM}", "%p"}, // AM or PM
     };

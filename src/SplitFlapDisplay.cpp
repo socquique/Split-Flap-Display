@@ -75,7 +75,7 @@ void SplitFlapDisplay::init() {
     SCLPin = settings.getInt("sclPin");
 
     if (busMutex == nullptr) {
-        busMutex = xSemaphoreCreateMutex();
+        busMutex = xSemaphoreCreateRecursiveMutex();
     }
 
     Wire.begin(SDAPin, SCLPin);
@@ -91,7 +91,7 @@ int SplitFlapDisplay::getDiagnostics(ModuleDiagnostics out[], int max) {
 
     // Positions and offsets are plain ints in RAM, so they are always safe to
     // report. Only the hall read touches i2c, and that has to wait for the bus.
-    bool haveBus = busMutex != nullptr && xSemaphoreTake(busMutex, pdMS_TO_TICKS(50)) == pdTRUE;
+    bool haveBus = busMutex != nullptr && xSemaphoreTakeRecursive(busMutex, pdMS_TO_TICKS(50)) == pdTRUE;
 
     for (int i = 0; i < count; i++) {
         out[i].address = moduleAddresses[i];
@@ -104,7 +104,7 @@ int SplitFlapDisplay::getDiagnostics(ModuleDiagnostics out[], int max) {
     }
 
     if (haveBus) {
-        xSemaphoreGive(busMutex);
+        xSemaphoreGiveRecursive(busMutex);
     }
 
     return count;
@@ -287,7 +287,7 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
     // Own the i2c bus for the whole move, starting before the first coil write:
     // the web server task must not interleave a hall read between any of them.
     if (busMutex != nullptr) {
-        xSemaphoreTake(busMutex, portMAX_DELAY);
+        xSemaphoreTakeRecursive(busMutex, portMAX_DELAY);
     }
 
     for (int i = 0; i < numModules; i++) {
@@ -320,7 +320,7 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
             stopMotors();
         }
         if (busMutex != nullptr) {
-            xSemaphoreGive(busMutex);
+            xSemaphoreGiveRecursive(busMutex);
         }
         return;
     }
@@ -441,7 +441,7 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
     }
 
     if (busMutex != nullptr) {
-        xSemaphoreGive(busMutex);
+        xSemaphoreGiveRecursive(busMutex);
     }
 }
 
@@ -449,6 +449,21 @@ void SplitFlapDisplay::stopMotors() {
     // Serial.println("Stopping Motors");
     for (int i = 0; i < numModules; i++) {
         modules[i].stop();
+    }
+}
+
+// Cut power to every coil right now. Called when an OTA update starts, which
+// can happen from inside moveTo() via the idle callback - hence the recursive
+// bus mutex, since that path already holds it on this same task.
+void SplitFlapDisplay::releaseMotorsNow() {
+    if (busMutex != nullptr) {
+        xSemaphoreTakeRecursive(busMutex, portMAX_DELAY);
+    }
+
+    stopMotors();
+
+    if (busMutex != nullptr) {
+        xSemaphoreGiveRecursive(busMutex);
     }
 }
 
