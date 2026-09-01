@@ -67,6 +67,10 @@ void SplitFlapMqtt::connectToMqtt() {
                 "\"name\":\"Display\","
                 "\"unique_id\":\"text_" + mdns + "\","
                 "\"command_topic\":\"" + topic_command + "\","
+                // Without a state topic Home Assistant has nowhere to read the
+                // current value from and shows the entity as unknown forever.
+                "\"state_topic\":\"" + topic_state + "\","
+                "\"max\":" + String(settings.getInt("moduleCount")) + ","
                 "\"availability_topic\":\"" + topic_avail + "\","
                 "\"device\":{"
                     "\"identifiers\":[\"splitflap_" + mdns + "\"],"
@@ -110,8 +114,15 @@ void SplitFlapMqtt::setDisplay(SplitFlapDisplay *d) {
 }
 
 void SplitFlapMqtt::publishState(const String &message) {
-    Serial.println("[MQTT] Publishing state: " + message);
-    mqttClient.publish(topic_state.c_str(), message.c_str(), true);
+    // writeString() hands us the string it sent to the modules, already padded
+    // out to fill them. Publishing that verbatim puts " 16:07  " on the state
+    // topic, so the Home Assistant sensor shows the padding and every template
+    // reading it needs a trim of its own.
+    String state = message;
+    state.trim();
+
+    Serial.println("[MQTT] Publishing state: " + state);
+    mqttClient.publish(topic_state.c_str(), state.c_str(), true);
 }
 
 void SplitFlapMqtt::loop() {
