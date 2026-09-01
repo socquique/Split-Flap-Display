@@ -103,11 +103,24 @@ bool JsonSettings::fromJson(JsonDocument settings) {
 
     for (JsonPair kv : settings.as<JsonObject>()) {
         const char *key = kv.key().c_str();
+
+        // Skip keys we do not know about instead of letting find() throw. This
+        // body runs on the web server task, where an uncaught exception panics
+        // the whole device - and a browser still holding a page from a
+        // different firmware version will happily post keys we have never
+        // heard of.
+        if (this->map.find(key) == this->map.end()) {
+            Serial.print("Ignoring unknown setting: ");
+            Serial.println(key);
+            continue;
+        }
+
         JsonSetting setting = this->find(key);
 
         if (! setting.validate(kv.value().as<String>())) {
             lastValidationError = setting.getLastValidationError();
             lastValidationKey = String(key);
+            preferences.end(); // do not leak the nvs handle on the error path
             return false;
         }
 
