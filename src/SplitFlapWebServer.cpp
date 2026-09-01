@@ -562,14 +562,25 @@ void SplitFlapWebServer::startWebServer() {
         response["message"] = "Settings saved successfully!";
 
         // TODO Refactor this it's gross
+        // Secrets arrive empty unless the user typed a new one, and empty means
+        // "unchanged" - comparing it against the stored value would report a
+        // change on every single save, rebooting and reconnecting for nothing.
+        auto secretChanged = [&json, this](const char *key) {
+            if (! json[key].is<String>()) {
+                return false;
+            }
+            String incoming = json[key].as<String>();
+            return incoming.length() > 0 && incoming != settings.getString(key);
+        };
+
         if ((json["ssid"].is<String>() && json["ssid"].as<String>() != settings.getString("ssid")) ||
-            (json["password"].is<String>() && json["password"].as<String>() != settings.getString("password"))) {
+            secretChanged("password")) {
             reconnect = true;
             response["message"] = "Settings updated successfully, Network " "settings have changed, reconnect to the " +
                 json["ssid"].as<String>() + " network";
         }
 
-        if (json["otaPass"].is<String>() && json["otaPass"].as<String>() != settings.getString("otaPass")) {
+        if (secretChanged("otaPass")) {
             rebootRequired = true; // OTA password change can only be applied by rebooting
         }
 
@@ -592,7 +603,7 @@ void SplitFlapWebServer::startWebServer() {
             ) ||
             (json["mqtt_port"].is<int>() && json["mqtt_port"].as<int>() != settings.getInt("mqtt_port")) ||
             (json["mqtt_user"].is<String>() && json["mqtt_user"].as<String>() != settings.getString("mqtt_user")) ||
-            (json["mqtt_pass"].is<String>() && json["mqtt_pass"].as<String>() != settings.getString("mqtt_pass"))) {
+            secretChanged("mqtt_pass")) {
             response["message"] = "Mqtt settings have changed, reconnecting...";
             reconnect = true;
         }
