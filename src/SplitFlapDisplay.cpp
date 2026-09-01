@@ -253,6 +253,9 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
     }
 
     if (! anyMoving) {
+        if (releaseMotors) {
+            stopMotors();
+        }
         return;
     }
 
