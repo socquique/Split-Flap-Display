@@ -39,9 +39,7 @@ class SplitFlapDisplay {
   private:
     JsonSettings &settings;
 
-    bool checkAllFalse(bool array[], int size);
     void stopMotors();
-    void startMotors();
 
     int numModules;
     uint8_t moduleAddresses[MAX_MODULES];
