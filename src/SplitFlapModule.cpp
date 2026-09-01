@@ -142,6 +142,13 @@ void SplitFlapModule::stop() {
     writeIO(IdleState);
 }
 
+void SplitFlapModule::releaseCoils(uint8_t address) {
+    Wire.beginTransmission(address);
+    Wire.write(IdleState & 0xFF);
+    Wire.write((IdleState >> 8) & 0xFF);
+    Wire.endTransmission();
+}
+
 // Re-energize the coil pattern the rotor is already resting on so the drum is
 // held before a move begins. step() leaves stepNumber pointing at the *next*
 // pattern to write, so the pattern currently under the rotor is stepNumber - 1.

@@ -14,6 +14,7 @@ class SplitFlapDisplay {
   public:
     SplitFlapDisplay(JsonSettings &settings);
 
+    void releaseAll(); // de-energize every module's coils as early as possible
     void init();
     void writeString(
         String inputString, float speed = MAX_RPM,
