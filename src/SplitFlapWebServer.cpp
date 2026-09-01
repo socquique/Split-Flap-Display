@@ -452,6 +452,51 @@ void SplitFlapWebServer::startWebServer() {
             }
         }
 
+        // Conditions worth acting on, phrased so they can be shown as-is. The
+        // device holds all of this already; leaving it to whoever remembers to
+        // compare two endpoints by hand is how a dead sensor goes unnoticed.
+        JsonArray health = doc["health"].to<JsonArray>();
+
+        auto warn = [&health](const char *level, const String &message) {
+            JsonObject entry = health.add<JsonObject>();
+            entry["level"] = level;
+            entry["message"] = message;
+        };
+
+        if (! this->isClockSynced()) {
+            warn("warn", "Clock not synchronised yet; date and time modes are holding off");
+        }
+
+        if (String(FIRMWARE_VERSION).endsWith("-dirty")) {
+            warn("warn", "Firmware was built from a modified working tree, so this build "
+                         "matches no commit");
+        }
+
+        if (display != nullptr && display->needsRestartForSettings()) {
+            warn("warn", "A saved setting differs from the one running; it applies on restart");
+        }
+
+        if (display != nullptr) {
+            ModuleDiagnostics check[MAX_MODULES];
+            int n = display->getDiagnostics(check, MAX_MODULES);
+            int perRot = display->getStepsPerRot();
+
+            for (int i = 0; i < n; i++) {
+                if (check[i].errored) {
+                    warn("error", "Module " + String(i) + " is not answering on i2c");
+                } else if (! check[i].everCorrected) {
+                    warn("warn", "Module " + String(i) + " has never found its magnet");
+                } else if (perRot > 0 && check[i].stepsSinceCorrection > 2 * perRot) {
+                    warn(
+                        "error",
+                        "Module " + String(i) + " has turned " +
+                            String(check[i].stepsSinceCorrection / perRot) +
+                            " revolutions without finding its magnet; check the sensor"
+                    );
+                }
+            }
+        }
+
         String body;
         serializeJson(doc, body);
         request->send(200, "application/json", body);

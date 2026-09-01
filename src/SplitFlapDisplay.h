@@ -31,6 +31,8 @@ struct ModuleDiagnostics
     int magnetError;
     int magnetTravel;
     bool magnetErrorValid;
+    int stepsSinceCorrection;
+    bool everCorrected;
 };
 
 class SplitFlapDisplay {
@@ -64,7 +66,12 @@ class SplitFlapDisplay {
     // else has to keep running - OTA, chiefly.
     void setIdleCallback(std::function<void()> callback) { idleCallback = callback; }
 
-    bool isMqttConnected() const; // reported by /diag, so the broker link can be
+    bool isMqttConnected() const;
+
+    // True when a stored setting differs from the one this run loaded at init().
+    // Those are only read once, so saving them changes nothing until a restart
+    // and the settings page gives no sign of it.
+    bool needsRestartForSettings(); // reported by /diag, so the broker link can be
                                   // checked without holding broker credentials
 
     void releaseMotorsNow(); // de-energize every coil immediately (OTA is starting)

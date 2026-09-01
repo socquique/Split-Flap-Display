@@ -106,6 +106,8 @@ int SplitFlapDisplay::getDiagnostics(ModuleDiagnostics out[], int max) {
         out[i].errored = modules[i].getHasErrored();
         out[i].magnetError = lastMagnetError[i];
         out[i].magnetTravel = lastMagnetTravel[i];
+        out[i].stepsSinceCorrection = stepsSinceCorrection[i];
+        out[i].everCorrected = everCorrected[i];
         // A reading only means something when the module covered close to one
         // full revolution between corrections; anything else is not comparable.
         out[i].magnetErrorValid = lastMagnetTravel[i] > (stepsPerRot * 3) / 4 &&
@@ -489,6 +491,24 @@ void SplitFlapDisplay::releaseMotorsNow() {
     if (busMutex != nullptr) {
         xSemaphoreGiveRecursive(busMutex);
     }
+}
+
+bool SplitFlapDisplay::needsRestartForSettings() {
+    if (settings.getInt("stepsPerRot") != stepsPerRot) return true;
+    if (settings.getInt("charset") != charSetSize) return true;
+    if (settings.getInt("moduleCount") != numModules) return true;
+    if (settings.getInt("magnetPosition") != magnetPosition) return true;
+    if (settings.getInt("displayOffset") != displayOffset) return true;
+    if (settings.getInt("sdaPin") != SDAPin) return true;
+    if (settings.getInt("sclPin") != SCLPin) return true;
+
+    std::vector<int> storedOffsets = settings.getIntVector("moduleOffsets");
+    for (int i = 0; i < numModules; i++) {
+        int stored = i < (int) storedOffsets.size() ? storedOffsets[i] : 0;
+        if (stored != moduleOffsets[i]) return true;
+    }
+
+    return false;
 }
 
 bool SplitFlapDisplay::isMqttConnected() const {
