@@ -274,6 +274,12 @@ void SplitFlapDisplay::writeString(String inputString, float speed, bool centeri
 void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMotors) {
     // TODO check length of array and return if empty
 
+    // Re-read rather than using the value cached at init(): tuning a display
+    // means changing this and watching what happens, and needing a reboot
+    // between every attempt makes that painful. One nvs read per move is
+    // nothing next to the seconds the move itself takes.
+    maxVel = settings.getFloat("maxVel");
+
     speed = constrain(speed, 2, maxVel);
     float stepsPerSecond = (speed / 60) * stepsPerRot;
     float timePerStep = 1000000 / stepsPerSecond;
