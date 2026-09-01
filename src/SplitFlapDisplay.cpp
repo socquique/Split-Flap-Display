@@ -431,7 +431,10 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
     while (! isFinished) {
         currentTime = micros();
         for (int i = 0; i < numModules; i++) {
-            if (((currentTime - lastStepTimes[i]) > stepPeriodUs) && stepsRemaining[i] > 0) {
+            // Signed: a module waiting for its turn has lastStepTimes in the
+            // future, and an unsigned difference would underflow into a huge
+            // positive number and fire the step immediately.
+            if (((long) (currentTime - lastStepTimes[i]) > (long) stepPeriodUs) && stepsRemaining[i] > 0) {
                 modules[i].step();
                 stepsRemaining[i]--;
                 if (stepsSinceCorrection[i] < 100 * stepsPerRot) {
@@ -448,7 +451,7 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
 
                 // If a long i2c burst left us more than a period behind, resync
                 // instead of firing a catch-up burst the motor cannot follow.
-                if (currentTime - lastStepTimes[i] > 2 * stepPeriodUs) {
+                if ((long) (currentTime - lastStepTimes[i]) > (long) (2 * stepPeriodUs)) {
                     lastStepTimes[i] = currentTime;
                 }
 
