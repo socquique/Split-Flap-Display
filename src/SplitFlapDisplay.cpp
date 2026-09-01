@@ -239,6 +239,7 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
     speed = constrain(speed, 2, maxVel);
     float stepsPerSecond = (speed / 60) * stepsPerRot;
     float timePerStep = 1000000 / stepsPerSecond;
+    unsigned long stepPeriodUs = (unsigned long) timePerStep;
 
     unsigned long currentTime = micros();
 
@@ -335,13 +336,26 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
     while (! isFinished) {
         currentTime = micros();
         for (int i = 0; i < numModules; i++) {
-            if (((currentTime - lastStepTimes[i]) > timePerStep) && stepsRemaining[i] > 0) {
+            if (((currentTime - lastStepTimes[i]) > stepPeriodUs) && stepsRemaining[i] > 0) {
                 modules[i].step();
                 stepsRemaining[i]--;
                 if (stepsSinceCorrection[i] < stepsPerRot) {
                     stepsSinceCorrection[i]++;
                 }
-                lastStepTimes[i] = micros();
+
+                // Advance the schedule by exactly one period rather than
+                // restarting it from now. Reading the clock again here folds the
+                // time this pass took into every interval, so the real step rate
+                // became timePerStep plus the cost of a loop pass - and that cost
+                // scales with how many modules are moving. Eight modules stepping
+                // together ran visibly slower than one, at the same requested RPM.
+                lastStepTimes[i] += stepPeriodUs;
+
+                // If a long i2c burst left us more than a period behind, resync
+                // instead of firing a catch-up burst the motor cannot follow.
+                if (currentTime - lastStepTimes[i] > 2 * stepPeriodUs) {
+                    lastStepTimes[i] = currentTime;
+                }
 
                 // Read this module's sensor right now if it is passing its
                 // magnet, rather than waiting for the next sweep.
