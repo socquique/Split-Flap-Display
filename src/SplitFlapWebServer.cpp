@@ -376,6 +376,7 @@ void SplitFlapWebServer::startWebServer() {
     // the piece you cannot see from outside when calibrating offsets by eye.
     server.on("/diag", HTTP_GET, [this](AsyncWebServerRequest *request) {
         JsonDocument doc;
+        doc["firmware"] = FIRMWARE_VERSION;
         doc["name"] = settings.getString("name");
         doc["uptime_s"] = millis() / 1000;
         doc["free_heap"] = ESP.getFreeHeap();

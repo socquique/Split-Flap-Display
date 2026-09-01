@@ -11,6 +11,10 @@
 #include <WiFi.h>
 #include <time.h>
 
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "unknown"
+#endif
+
 class SplitFlapDisplay;
 
 class SplitFlapWebServer {

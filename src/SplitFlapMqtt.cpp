@@ -60,7 +60,7 @@ void SplitFlapMqtt::connectToMqtt() {
                     "\"name\":\"" + name + "\","
                     "\"manufacturer\":\"SplitFlap\","
                     "\"model\":\"SplitFlap Display\","
-                    "\"sw_version\":\"1.0.0\""
+                    "\"sw_version\":\"" + String(FIRMWARE_VERSION) + "\""
                 "}"
             "}";
 
@@ -75,7 +75,7 @@ void SplitFlapMqtt::connectToMqtt() {
                     "\"name\":\"" + name + "\","
                     "\"manufacturer\":\"SplitFlap\","
                     "\"model\":\"SplitFlap Display\","
-                    "\"sw_version\":\"1.0.0\""
+                    "\"sw_version\":\"" + String(FIRMWARE_VERSION) + "\""
                 "}"
             "}";
             // clang-format on
