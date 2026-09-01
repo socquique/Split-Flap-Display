@@ -64,10 +64,51 @@ document.addEventListener("alpine:init", () => {
             this.settings.moduleOffsets = arr.join(",");
         },
 
+        diag: null,
+
+        // What the modules physically read, decoded from their step positions.
+        // This is the hardware talking, not what we asked it to show - the two
+        // disagreeing is the whole symptom of a miscalibrated display.
+        get diagChars() {
+            if (!this.diag?.modules?.length) return [];
+            const charset =
+                this.settings.custom_charset ||
+                " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789':?!.-/$@#%";
+            const perFlap = this.diag.stepsPerFlap || 1;
+            return this.diag.modules.map((m) => {
+                const index = Math.round(m.position / perFlap) % charset.length;
+                return charset[index] ?? "?";
+            });
+        },
+
+        get diagAgrees() {
+            if (!this.diag) return true;
+            return (
+                this.diagChars.join("").trim() === (this.diag.written || "").trim()
+            );
+        },
+
+        get uptimeText() {
+            const total = this.diag?.uptime_s ?? 0;
+            const h = Math.floor(total / 3600);
+            const m = Math.floor((total % 3600) / 60);
+            return h > 0 ? `${h}h ${m}m` : `${m}m ${total % 60}s`;
+        },
+
+        loadDiag() {
+            fetch("/diag")
+                .then((r) => r.json())
+                .then((d) => (this.diag = d))
+                .catch(() => (this.diag = null));
+        },
+
         init() {
             this.loadSettings();
             if (type === "Settings") {
                 this.loadTimezones();
+            } else {
+                this.loadDiag();
+                setInterval(() => this.loadDiag(), 5000);
             }
         },
 

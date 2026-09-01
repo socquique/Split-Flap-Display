@@ -174,6 +174,51 @@
                 >Settings</a
             >
         </div>
+
+        <!--
+            Live state read back from the hardware. diagChars is decoded from the
+            step position each module reports, so it is what the drums are really
+            showing - not what we asked for. When the two disagree the display has
+            drifted, and that used to be invisible from anywhere.
+        -->
+        <div
+            x-show="diag"
+            x-cloak
+            class="max-w-lg w-11/12 mb-10 -mt-2 text-center"
+        >
+            <div class="flex gap-1 justify-center flex-wrap" aria-label="Currently displayed">
+                <template x-for="(char, index) in diagChars" :key="index">
+                    <span
+                        class="relative w-9 h-12 flex items-center justify-center rounded bg-neutral-950 text-gray-100 text-2xl font-bold font-mono shadow-inner border border-black/60 after:absolute after:left-0 after:right-0 after:top-1/2 after:h-px after:bg-black/70"
+                        x-text="char === ' ' ? '' : char"
+                    ></span>
+                </template>
+            </div>
+
+            <div
+                class="mt-3 flex flex-wrap gap-x-4 gap-y-1 justify-center text-xs text-neutral-500"
+            >
+                <span x-show="!diagAgrees" class="text-amber-500 font-semibold"
+                    >drum position does not match the requested text</span
+                >
+                <span
+                    >fw <span class="text-neutral-400" x-text="diag?.firmware"></span
+                ></span>
+                <span>up <span class="text-neutral-400" x-text="uptimeText"></span></span>
+                <span
+                    >wifi
+                    <span class="text-neutral-400" x-text="`${diag?.rssi} dBm`"></span
+                ></span>
+                <span
+                    >heap
+                    <span
+                        class="text-neutral-400"
+                        x-text="`${Math.round((diag?.free_heap ?? 0) / 1024)} kB`"
+                    ></span
+                ></span>
+            </div>
+        </div>
+
         <div
             class="fixed top-4 left-1/2 transform -translate-x-1/2 p-4 text-white rounded-md transition duration-300"
             :class="{'bg-green-600': dialog.type === 'success', 'bg-red-500': dialog.type === 'error'}"
