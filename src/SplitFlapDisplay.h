@@ -4,11 +4,26 @@
 #include "SplitFlapModule.h"
 
 #include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+#include <functional>
 
 #define MAX_MODULES 8 // for memory allocation, update if more modules
 #define MAX_RPM 15.0f
 
 class SplitFlapMqtt;
+
+// Snapshot of one module, for the /diag endpoint. hall is 1 high, 0 low, or -1
+// when the i2c bus was busy and we declined to read it.
+struct ModuleDiagnostics
+{
+    uint8_t address;
+    int position;
+    int magnetPosition;
+    int stepsToMagnet;
+    int hall;
+    bool errored;
+};
 
 class SplitFlapDisplay {
   public:
@@ -37,6 +52,13 @@ class SplitFlapDisplay {
     int getCharsetSize() const { return charSetSize; }
     void setMqtt(SplitFlapMqtt *mqttHandler);
 
+    // Pumped from inside the move loop so long moves stop starving whatever
+    // else has to keep running - OTA, chiefly.
+    void setIdleCallback(std::function<void()> callback) { idleCallback = callback; }
+
+    int getStepsPerRot() const { return stepsPerRot; }
+    int getDiagnostics(ModuleDiagnostics out[], int max);
+
   private:
     JsonSettings &settings;
 
@@ -57,4 +79,11 @@ class SplitFlapDisplay {
     int SCLPin;         // SCL pin
 
     SplitFlapMqtt *mqtt = nullptr;
+    std::function<void()> idleCallback = nullptr;
+
+    // Wire is not reentrant, and the web server runs on its own task. Held for
+    // the duration of a move; the diagnostics endpoint only takes it to read a
+    // hall sensor, and gives up rather than stalling an HTTP request behind a
+    // full revolution.
+    SemaphoreHandle_t busMutex = nullptr;
 };

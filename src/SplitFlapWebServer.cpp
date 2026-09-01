@@ -1,5 +1,7 @@
 #include "SplitFlapWebServer.h"
 
+#include "SplitFlapDisplay.h"
+
 #include <ArduinoJson.h>
 #include <AsyncJson.h>
 
@@ -330,6 +332,50 @@ void SplitFlapWebServer::startWebServer() {
 
     server.on("/settings", HTTP_GET, [this](AsyncWebServerRequest *request) {
         request->send(200, "application/json", settings.toJson().as<String>());
+    });
+
+    // Read-only snapshot of what every module thinks its position is, which is
+    // the piece you cannot see from outside when calibrating offsets by eye.
+    server.on("/diag", HTTP_GET, [this](AsyncWebServerRequest *request) {
+        JsonDocument doc;
+        doc["name"] = settings.getString("name");
+        doc["uptime_s"] = millis() / 1000;
+        doc["free_heap"] = ESP.getFreeHeap();
+        doc["rssi"] = WiFi.RSSI();
+        doc["mode"] = this->getMode();
+        doc["written"] = this->writtenString;
+
+        if (display != nullptr) {
+            int stepsPerRot = display->getStepsPerRot();
+            int charset = display->getCharsetSize();
+            doc["stepsPerRot"] = stepsPerRot;
+            doc["charset"] = charset;
+            doc["stepsPerFlap"] = charset > 0 ? (float) stepsPerRot / (float) charset : 0.0f;
+
+            ModuleDiagnostics diags[MAX_MODULES];
+            int found = display->getDiagnostics(diags, MAX_MODULES);
+
+            JsonArray modules = doc["modules"].to<JsonArray>();
+            for (int i = 0; i < found; i++) {
+                JsonObject entry = modules.add<JsonObject>();
+                entry["module"] = i;
+                entry["address"] = diags[i].address;
+                entry["position"] = diags[i].position;
+                entry["magnetPosition"] = diags[i].magnetPosition;
+                entry["stepsToMagnet"] = diags[i].stepsToMagnet;
+                entry["errored"] = diags[i].errored;
+
+                if (diags[i].hall < 0) {
+                    entry["hall"] = nullptr; // bus was busy, we did not read it
+                } else {
+                    entry["hall"] = diags[i].hall == 1;
+                }
+            }
+        }
+
+        String body;
+        serializeJson(doc, body);
+        request->send(200, "application/json", body);
     });
 
     server.on("/settings/reset", HTTP_POST, [this](AsyncWebServerRequest *request) {

@@ -11,9 +11,12 @@
 #include <WiFi.h>
 #include <time.h>
 
+class SplitFlapDisplay;
+
 class SplitFlapWebServer {
   public:
     SplitFlapWebServer(JsonSettings &settings);
+    void setDisplay(SplitFlapDisplay *displayHandler) { display = displayHandler; }
     void init();
     void setTimezone();
     void checkRebootRequired();
@@ -75,6 +78,8 @@ class SplitFlapWebServer {
     void setMultiDelay(int input) { multiWordDelay = input; }
 
     unsigned long lastCheckDateTime;
+    SplitFlapDisplay *display = nullptr;
+
     int checkDateInterval;
 
     int connectionMode; // 0 is AP mode, 1 is Internet Mode

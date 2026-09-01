@@ -74,12 +74,40 @@ void SplitFlapDisplay::init() {
     SDAPin = settings.getInt("sdaPin");
     SCLPin = settings.getInt("sclPin");
 
+    if (busMutex == nullptr) {
+        busMutex = xSemaphoreCreateMutex();
+    }
+
     Wire.begin(SDAPin, SCLPin);
     Wire.setClock(400000);
 
     for (uint8_t i = 0; i < numModules; i++) {
         modules[i].init();
     }
+}
+
+int SplitFlapDisplay::getDiagnostics(ModuleDiagnostics out[], int max) {
+    int count = numModules < max ? numModules : max;
+
+    // Positions and offsets are plain ints in RAM, so they are always safe to
+    // report. Only the hall read touches i2c, and that has to wait for the bus.
+    bool haveBus = busMutex != nullptr && xSemaphoreTake(busMutex, pdMS_TO_TICKS(50)) == pdTRUE;
+
+    for (int i = 0; i < count; i++) {
+        out[i].address = moduleAddresses[i];
+        out[i].position = modules[i].getPosition();
+        out[i].magnetPosition = modules[i].getMagnetPosition();
+        out[i].stepsToMagnet =
+            ((modules[i].getMagnetPosition() - modules[i].getPosition()) % stepsPerRot + stepsPerRot) % stepsPerRot;
+        out[i].errored = modules[i].getHasErrored();
+        out[i].hall = haveBus ? (modules[i].readHallEffectSensor() ? 1 : 0) : -1;
+    }
+
+    if (haveBus) {
+        xSemaphoreGive(busMutex);
+    }
+
+    return count;
 }
 
 void SplitFlapDisplay::testAll() {
@@ -288,6 +316,12 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
         return;
     }
 
+    // Own the i2c bus for the whole move: the web server task must not
+    // interleave a hall read between our coil writes.
+    if (busMutex != nullptr) {
+        xSemaphoreTake(busMutex, portMAX_DELAY);
+    }
+
     delay(startStopDelay); // give the motor time to align to magnetic field
 
     // How close a module has to be to its magnet before we stop waiting for the
@@ -331,6 +365,9 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
             resetLatches[i] = false;
         }
     };
+
+    const unsigned long idlePumpIntervalUs = 20 * 1000;
+    unsigned long lastIdlePumpTime = currentTime;
 
     bool isFinished = false;
     while (! isFinished) {
@@ -377,6 +414,15 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
             // take a moment to execute
         }
 
+        // A full revolution takes about six seconds at 10 RPM, during which
+        // loop() never comes round again. That is long enough for an OTA
+        // invitation to time out, so pump the hook here. Rate limited: it runs
+        // on the same budget as the steps.
+        if (idleCallback && (currentTime - lastIdlePumpTime) > idlePumpIntervalUs) {
+            idleCallback();
+            lastIdlePumpTime = currentTime;
+        }
+
         isFinished = true;
         for (int i = 0; i < numModules; i++) {
             if (stepsRemaining[i] > 0) {
@@ -385,6 +431,11 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
             }
         }
     }
+
+    if (busMutex != nullptr) {
+        xSemaphoreGive(busMutex);
+    }
+
     if (releaseMotors) {
         delay(startStopDelay); // allow all motors time to settle
         stopMotors();

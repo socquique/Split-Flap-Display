@@ -72,6 +72,8 @@ void setup() {
         webServer.startWebServer();
 
         display.init();
+        webServer.setDisplay(&display);
+        display.setIdleCallback([]() { webServer.handleOta(); });
         display.homeToString("");
 
         if (display.getNumModules() == 8) {
@@ -88,6 +90,11 @@ void setup() {
         splitflapMqtt.setup();
         splitflapMqtt.setDisplay(&display);
         display.setMqtt(&splitflapMqtt);
+        webServer.setDisplay(&display);
+
+        // A full revolution blocks loop() for about six seconds, long enough for
+        // an OTA invitation to time out. Keep servicing it from inside the move.
+        display.setIdleCallback([]() { webServer.handleOta(); });
 
         display.homeToString("OK");
         delay(250);
