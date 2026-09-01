@@ -54,6 +54,9 @@ void setup() {
     // put your setup code here, to run once:
     Serial.begin(SERIAL_SPEED);
 
+    // Before anything else: the modules power up with every coil energized.
+    display.releaseAll();
+
 #ifdef STARTUP_DELAY
     delay(STARTUP_DELAY);
 #endif

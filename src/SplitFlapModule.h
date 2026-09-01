@@ -12,6 +12,11 @@ class SplitFlapModule {
 
     void init();
 
+    // Writes the idle pattern straight to an address, without needing a
+    // constructed module. Used to kill the power-on coil current as early as
+    // possible, before the settings are even loaded into modules.
+    static void releaseCoils(uint8_t address);
+
     void step();                                             // advance the motor one full step
     void stop();                                             // write all motor input pins to low
     void start();                                            // re-energize coils in place, without moving

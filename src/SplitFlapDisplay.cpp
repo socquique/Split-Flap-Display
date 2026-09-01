@@ -6,6 +6,29 @@
 
 SplitFlapDisplay::SplitFlapDisplay(JsonSettings &settings) : settings(settings) {}
 
+// The PCF8575 powers up with every output high, which on this hardware means
+// all four coils of every module are energized - roughly double the current a
+// module draws while actually turning, on all of them at once. Nothing writes
+// them low until init(), which runs after the web server is up and after a WiFi
+// connect that blocks for up to 20 seconds, so the whole display sits at that
+// current for the entire startup. Call this first instead: it only needs the
+// pin and address settings, and costs a handful of i2c writes.
+void SplitFlapDisplay::releaseAll() {
+    int count = constrain(settings.getInt("moduleCount"), 1, MAX_MODULES);
+    std::vector<int> addresses = settings.getIntVector("moduleAddresses");
+
+    Wire.begin(settings.getInt("sdaPin"), settings.getInt("sclPin"));
+    Wire.setClock(400000);
+
+    for (int i = 0; i < count; i++) {
+        SplitFlapModule::releaseCoils((uint8_t) (i < (int) addresses.size() ? addresses[i] : 0x20 + i));
+    }
+
+    Serial.print("Released coils on ");
+    Serial.print(count);
+    Serial.println(" modules");
+}
+
 void SplitFlapDisplay::init() {
     numModules = settings.getInt("moduleCount");
     stepsPerRot = settings.getInt("stepsPerRot");
