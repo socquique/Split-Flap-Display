@@ -235,6 +235,72 @@
                 </div>
             </div>
 
+            <div class="grid grid-cols-2 gap-2 w-full">
+                <div>
+                    <label class="flex text-lg mt-4 justify-between" for="quiet_start"
+                        >Quiet from</label
+                    >
+                    <select
+                        class="w-full p-3 mt-2 text-lg border border-gray-600 rounded-md text-center bg-neutral-700 text-gray-100"
+                        id="quiet_start"
+                        x-model.number="settings.quietStart"
+                    >
+                        <template x-for="h in 24" :key="h">
+                            <option
+                                :value="h - 1"
+                                x-text="`${String(h - 1).padStart(2, '0')}:00`"
+                            ></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="flex text-lg mt-4 justify-between" for="quiet_end">until</label>
+                    <select
+                        class="w-full p-3 mt-2 text-lg border border-gray-600 rounded-md text-center bg-neutral-700 text-gray-100"
+                        id="quiet_end"
+                        x-model.number="settings.quietEnd"
+                    >
+                        <template x-for="h in 24" :key="h">
+                            <option
+                                :value="h - 1"
+                                x-text="`${String(h - 1).padStart(2, '0')}:00`"
+                            ></option>
+                        </template>
+                    </select>
+                </div>
+                <p class="col-span-2 text-sm text-neutral-400 -mt-1">
+                    <span
+                        x-text="settings.quietStart === settings.quietEnd
+                            ? 'Off — the display moves at all hours.'
+                            : 'The clock, date and random modes hold still between these hours. Text you send yourself still shows.'"
+                    ></span>
+                </p>
+            </div>
+
+            <div class="flex items-center justify-between w-full mt-6">
+                <label class="text-lg font-medium" for="sync_landing"
+                    >Land all modules together</label
+                >
+                <label class="relative inline-block w-12 h-6">
+                    <input
+                        type="checkbox"
+                        id="sync_landing"
+                        class="hidden"
+                        :checked="settings.syncLanding === 1"
+                        @change="settings.syncLanding = $event.target.checked ? 1 : 0"
+                    />
+                    <span
+                        class="absolute inset-0 bg-neutral-600 rounded-full cursor-pointer transition duration-300"
+                    ></span>
+                    <span
+                        class="absolute left-1 top-1 w-4 h-4 cursor-pointer rounded-full transition-transform duration-300"
+                        :class="settings.syncLanding === 1
+                            ? 'translate-x-6 bg-green-600'
+                            : 'translate-x-0 bg-neutral-300'"
+                    ></span>
+                </label>
+            </div>
+
             <h2
                 class="text-xl font-semibold text-left w-full border-b border-gray-600 pb-2 mt-10 mb-2"
             >

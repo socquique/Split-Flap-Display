@@ -40,6 +40,11 @@ class SplitFlapWebServer {
     // display a wrong time, another when the clock jumps to the real one.
     bool isClockSynced() const;
 
+    // True while automatic modes should stay still. Eight steppers a metre from
+    // a bed, moving once a minute all night, is the one thing a clock like this
+    // does that nobody asked for.
+    bool inQuietHours();
+
     // Wifi Connectivity
     bool loadWiFiCredentials();
     bool connectToWifi();
@@ -105,6 +110,8 @@ class SplitFlapWebServer {
 
     int cachedMode = 0;
     unsigned long modeCacheTime = 0;
+    bool cachedQuiet = false;
+    unsigned long quietCacheTime = 0;
 
     // Reconnect backoff. A wifi association needs seconds; retrying faster than
     // that just aborts the attempt already in flight.

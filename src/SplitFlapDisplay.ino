@@ -49,7 +49,12 @@ JsonSettings settings = JsonSettings("config", {
     {"inputText", JsonSetting("")},
     {"multiText", JsonSetting("")},
     {"multiDelay", JsonSetting(1, 1, 3600)},
-    {"centerText", JsonSetting(0, 0, 1)}
+    {"centerText", JsonSetting(0, 0, 1)},
+    // Presentation and wear
+    {"syncLanding", JsonSetting(1, 0, 1)},
+    // Quiet hours: no automatic movement between these two hours. Equal means off.
+    {"quietStart", JsonSetting(0, 0, 23)},
+    {"quietEnd", JsonSetting(0, 0, 23)}
 });
 // clang-format on
 
@@ -116,14 +121,27 @@ void loop() {
         display.home();
     }
 
+    // Quiet hours silence the modes that move on their own. Text put there
+    // deliberately, from the web page or over MQTT, still goes through: the
+    // point is to stop the display waking you up, not to stop it working.
+    bool quiet = webServer.inQuietHours();
+
     // check what mode the display is in, this value is updated by the web server
     switch (webServer.getMode()) {
         case 0: singleInputMode(); break;
-        case 1: multiInputMode(); break;
-        case 2: dateMode(); break;
-        case 3: timeMode(); break;
+        case 1:
+            if (! quiet) multiInputMode();
+            break;
+        case 2:
+            if (! quiet) dateMode();
+            break;
+        case 3:
+            if (! quiet) timeMode();
+            break;
         case 4: break;
-        case 5: randomTest(); break;
+        case 5:
+            if (! quiet) randomTest();
+            break;
         // The web page uses 6 for Custom Text and then POSTs /text, which
         // rewrites the mode to 0 or 1. Saving settings while that option is
         // selected leaves 6 stored, and the display then did nothing at all.

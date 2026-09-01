@@ -345,6 +345,35 @@ void SplitFlapDisplay::moveTo(int targetPositions[], float speed, bool releaseMo
 
     delay(startStopDelay); // give the motor time to align to magnetic field
 
+    // Land every module at the same instant. Without this a move is a ragged
+    // parade: the module changing one flap arrives in a fifth of a second while
+    // the one crossing most of its drum takes six, which reads as eight
+    // independent motors rather than one display.
+    //
+    // The modules with less to travel wait and then run at the normal speed,
+    // rather than crawling through their flaps in slow motion for the same
+    // total time - the cadence of the flaps falling is the whole character of
+    // the thing.
+    if (settings.getInt("syncLanding") != 0) {
+        int furthest = 0;
+        for (int i = 0; i < numModules; i++) {
+            if (stepsRemaining[i] > furthest) {
+                furthest = stepsRemaining[i];
+            }
+        }
+
+        unsigned long now = micros();
+        for (int i = 0; i < numModules; i++) {
+            if (stepsRemaining[i] <= 0) {
+                continue;
+            }
+            // First step falls due exactly when this module has to set off for
+            // all of them to finish together.
+            unsigned long wait = (unsigned long) (furthest - stepsRemaining[i]) * stepPeriodUs;
+            lastStepTimes[i] = now + wait - stepPeriodUs;
+        }
+    }
+
     // How close a module has to be to its magnet before we stop waiting for the
     // 20ms sweep and read its sensor after every single step. At 10 RPM a step
     // is ~2.9ms, so the sweep alone only tells us where the magnet edge was to

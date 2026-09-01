@@ -189,6 +189,30 @@ bool SplitFlapWebServer::isClockSynced() const {
     return time(nullptr) > 1700000000;
 }
 
+bool SplitFlapWebServer::inQuietHours() {
+    // Asked on every pass through loop(); the answer changes once an hour.
+    unsigned long now = millis();
+    if (quietCacheTime != 0 && now - quietCacheTime < 5000) {
+        return cachedQuiet;
+    }
+    quietCacheTime = now;
+
+    int start = settings.getInt("quietStart");
+    int end = settings.getInt("quietEnd");
+
+    if (start == end || ! isClockSynced()) {
+        cachedQuiet = false; // disabled, or we do not know what time it is
+        return cachedQuiet;
+    }
+
+    time_t stamp = time(nullptr);
+    struct tm *local = localtime(&stamp);
+    int hour = local->tm_hour;
+
+    cachedQuiet = (start < end) ? (hour >= start && hour < end) : (hour >= start || hour < end);
+    return cachedQuiet;
+}
+
 void SplitFlapWebServer::checkWiFi() {
     if (connectionMode != 1) {
         return;
@@ -483,8 +507,17 @@ void SplitFlapWebServer::startWebServer() {
             entry["message"] = message;
         };
 
+        doc["quiet_hours"] = this->inQuietHours();
+
         if (! this->isClockSynced()) {
             warn("warn", "Clock not synchronised yet; date and time modes are holding off");
+        }
+
+        if (this->inQuietHours()) {
+            warn(
+                "info",
+                "Quiet hours: holding still until " + String(settings.getInt("quietEnd")) + ":00"
+            );
         }
 
         if (String(FIRMWARE_VERSION).endsWith("-dirty")) {

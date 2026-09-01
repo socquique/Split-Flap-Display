@@ -204,11 +204,13 @@
                     <template x-for="(item, index) in diag.health" :key="index">
                         <div
                             class="flex items-start gap-2 px-3 py-2 rounded border text-sm"
-                            :class="item.level === 'error'
-                                ? 'border-red-800 bg-red-950/40 text-red-300'
-                                : 'border-amber-800 bg-amber-950/30 text-amber-300'"
+                            :class="{
+                                'border-red-800 bg-red-950/40 text-red-300': item.level === 'error',
+                                'border-amber-800 bg-amber-950/30 text-amber-300': item.level === 'warn',
+                                'border-neutral-700 bg-neutral-800 text-neutral-300': item.level === 'info',
+                            }"
                         >
-                            <span class="font-bold leading-5" x-text="item.level === 'error' ? '!' : '?'"></span>
+                            <span class="font-bold leading-5" x-text="item.level === 'error' ? '!' : (item.level === 'info' ? '·' : '?')"></span>
                             <span x-text="item.message"></span>
                         </div>
                     </template>
