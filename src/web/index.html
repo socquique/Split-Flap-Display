@@ -158,6 +158,27 @@
                             />
                         </div>
                     </div>
+
+                    <div class="mt-4 w-full">
+                        <label for="duration" class="block text-left text-lg"
+                            >Show for (minutes)</label
+                        >
+                        <input
+                            class="w-full p-3 mt-2 text-lg border border-neutral-600 rounded-md text-center bg-neutral-700 text-white"
+                            type="number"
+                            id="duration"
+                            min="0"
+                            step="1"
+                            x-model.number="durationMinutes"
+                        />
+                        <p class="text-left text-sm text-neutral-400 mt-1">
+                            <span
+                                x-text="durationMinutes > 0
+                                    ? `Returns to the previous mode after ${durationMinutes} minute${durationMinutes === 1 ? '' : 's'}.`
+                                    : 'Stays until you change it.'"
+                            ></span>
+                        </p>
+                    </div>
                 </div>
             </template>
 

@@ -45,6 +45,19 @@ class SplitFlapWebServer {
     // does that nobody asked for.
     bool inQuietHours();
 
+    // A message posted with a duration returns the display to whatever it was
+    // showing when the time is up, so an announcement does not have to be
+    // undone by hand.
+    void checkTemporaryMessage();
+
+    void requestHome() { homeRequested = true; }
+
+    void setMode(int targetMode); // also driven from the MQTT mode topic
+
+    // Store a comma separated word list and switch to cycling it. Shared by the
+    // /text handler and the MQTT command topic so both persist it identically.
+    void setWords(const String &csv);
+
     // Wifi Connectivity
     bool loadWiFiCredentials();
     bool connectToWifi();
@@ -98,7 +111,6 @@ class SplitFlapWebServer {
     void setInputString(String input) { inputString = input; }
     void setMultiInputString(String input) { multiInputString = input; }
 
-    void setMode(int targetMode);
     void setMultiDelay(int input) { multiWordDelay = input; }
 
     unsigned long lastCheckDateTime;

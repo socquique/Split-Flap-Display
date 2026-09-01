@@ -1,5 +1,7 @@
 #include "SplitFlapMqtt.h"
 
+#include "SplitFlapWebServer.h"
+
 SplitFlapMqtt::SplitFlapMqtt(JsonSettings &settings, WiFiClient &wifiClient)
     : settings(settings), wifiClient(wifiClient), mqttClient(wifiClient), display(nullptr) {}
 
@@ -15,8 +17,14 @@ void SplitFlapMqtt::setup() {
     topic_command = "splitflap/" + mdns + "/set";
     topic_state = "splitflap/" + mdns + "/state";
     topic_avail = "splitflap/" + mdns + "/availability";
+    topic_mode_command = "splitflap/" + mdns + "/mode/set";
+    topic_mode_state = "splitflap/" + mdns + "/mode";
+    topic_words_command = "splitflap/" + mdns + "/words/set";
+    topic_home_command = "splitflap/" + mdns + "/home/set";
     topic_config_text = "homeassistant/text/splitflap_text_" + mdns + "/config";
     topic_config_sensor = "homeassistant/sensor/splitflap_sensor_" + mdns + "/config";
+    topic_config_select = "homeassistant/select/splitflap_mode_" + mdns + "/config";
+    topic_config_button = "homeassistant/button/splitflap_home_" + mdns + "/config";
 
     mqttClient.setServer(mqttServer.c_str(), mqttPort);
     mqttClient.setCallback([this](char *topic, byte *payload, unsigned int length) {
@@ -24,11 +32,7 @@ void SplitFlapMqtt::setup() {
         for (unsigned int i = 0; i < length; i++) {
             message += (char) payload[i];
         }
-        Serial.printf("[MQTT] Message received: %s\n", message.c_str());
-        if (display) {
-            float maxVel = settings.getFloat("maxVel");
-            display->writeString(message, maxVel, false);
-        }
+        this->handleCommand(String(topic), message);
     });
 
     if (mqttServer.length() == 0) {
@@ -98,11 +102,47 @@ void SplitFlapMqtt::connectToMqtt() {
             // clang-format on
 
             mqttClient.subscribe(topic_command.c_str());
+            mqttClient.subscribe(topic_mode_command.c_str());
+            mqttClient.subscribe(topic_words_command.c_str());
+            mqttClient.subscribe(topic_home_command.c_str());
             mqttClient.publish(topic_avail.c_str(), "online", true);
             mqttClient.publish(topic_state.c_str(), "", true);
 
+            // clang-format off
+            String device = "\"device\":{"
+                    "\"identifiers\":[\"splitflap_" + mdns + "\"],"
+                    "\"name\":\"" + name + "\","
+                    "\"manufacturer\":\"SplitFlap\","
+                    "\"model\":\"SplitFlap Display\","
+                    "\"sw_version\":\"" + String(FIRMWARE_VERSION) + "\""
+                "}";
+
+            String payload_select = "{"
+                "\"name\":\"Mode\","
+                "\"unique_id\":\"mode_" + mdns + "\","
+                "\"command_topic\":\"" + topic_mode_command + "\","
+                "\"state_topic\":\"" + topic_mode_state + "\","
+                "\"availability_topic\":\"" + topic_avail + "\","
+                "\"options\":[\"Date\",\"Time\",\"Text\",\"Words\",\"Random\"],"
+                + device +
+            "}";
+
+            String payload_button = "{"
+                "\"name\":\"Re-home\","
+                "\"unique_id\":\"home_" + mdns + "\","
+                "\"command_topic\":\"" + topic_home_command + "\","
+                "\"availability_topic\":\"" + topic_avail + "\","
+                "\"entity_category\":\"config\","
+                + device +
+            "}";
+            // clang-format on
+
             mqttClient.publish(topic_config_text.c_str(), payload_text.c_str(), true);
             mqttClient.publish(topic_config_sensor.c_str(), payload_sensor.c_str(), true);
+            mqttClient.publish(topic_config_select.c_str(), payload_select.c_str(), true);
+            mqttClient.publish(topic_config_button.c_str(), payload_button.c_str(), true);
+
+            lastPublishedMode = -1; // force a state publish on the next loop
         } else {
             Serial.println("[MQTT] Failed to connect");
         }
@@ -111,6 +151,59 @@ void SplitFlapMqtt::connectToMqtt() {
 
 void SplitFlapMqtt::setDisplay(SplitFlapDisplay *d) {
     display = d;
+}
+
+void SplitFlapMqtt::setWebServer(SplitFlapWebServer *server) {
+    webServer = server;
+}
+
+const char *SplitFlapMqtt::modeName(int mode) {
+    switch (mode) {
+        case 0:
+        case 6: return "Text";
+        case 1: return "Words";
+        case 2: return "Date";
+        case 5: return "Random";
+        default: return "Time";
+    }
+}
+
+int SplitFlapMqtt::modeFromName(const String &name) {
+    if (name.equalsIgnoreCase("Date")) return 2;
+    if (name.equalsIgnoreCase("Text")) return 0;
+    if (name.equalsIgnoreCase("Words")) return 1;
+    if (name.equalsIgnoreCase("Random")) return 5;
+    return 3; // Time
+}
+
+void SplitFlapMqtt::handleCommand(const String &topic, const String &payload) {
+    Serial.println("[MQTT] " + topic + " -> " + payload);
+
+    if (topic == topic_mode_command) {
+        if (webServer) {
+            webServer->setMode(modeFromName(payload));
+        }
+        return;
+    }
+
+    if (topic == topic_words_command) {
+        if (webServer) {
+            webServer->setWords(payload); // comma separated, switches to Words
+        }
+        return;
+    }
+
+    if (topic == topic_home_command) {
+        if (webServer) {
+            webServer->requestHome(); // run from loop(), never here: home() blocks
+        }
+        return;
+    }
+
+    // Anything else on the plain command topic is text to show.
+    if (display) {
+        display->writeString(payload, settings.getFloat("maxVel"), false);
+    }
 }
 
 void SplitFlapMqtt::publishState(const String &message) {
@@ -133,6 +226,18 @@ void SplitFlapMqtt::loop() {
     if (mqttClient.connected()) {
         retryCount = 0;
         mqttClient.loop();
+
+        // Keep the Home Assistant select showing what the display is doing,
+        // including changes made from the web page.
+        unsigned long now = millis();
+        if (now - lastModeCheck > 2000) {
+            lastModeCheck = now;
+            int mode = settings.getInt("mode");
+            if (mode != lastPublishedMode) {
+                lastPublishedMode = mode;
+                mqttClient.publish(topic_mode_state.c_str(), modeName(mode), true);
+            }
+        }
         return;
     }
 

@@ -189,6 +189,43 @@ bool SplitFlapWebServer::isClockSynced() const {
     return time(nullptr) > 1700000000;
 }
 
+void SplitFlapWebServer::setWords(const String &csv) {
+    multiInputString = csv;
+    settings.putString("multiText", csv);
+
+    numMultiWords = 0;
+    if (csv.length() > 0) {
+        numMultiWords = 1;
+        for (unsigned int i = 0; i < csv.length(); i++) {
+            if (csv[i] == ',') {
+                numMultiWords++;
+            }
+        }
+    }
+
+    multiWordCurrentIndex = 0;
+    writtenString = "";
+    setMode(1);
+}
+
+void SplitFlapWebServer::checkTemporaryMessage() {
+    long until = settings.getInt("tempUntil");
+    if (until == 0 || ! isClockSynced()) {
+        return;
+    }
+
+    if ((long) time(nullptr) < until) {
+        return;
+    }
+
+    int back = settings.getInt("tempReturnMode");
+    Serial.println("Temporary message expired, returning to mode " + String(back));
+
+    settings.putInt("tempUntil", 0);
+    this->writtenString = ""; // make the restored mode redraw immediately
+    setMode(back);
+}
+
 bool SplitFlapWebServer::inQuietHours() {
     // Asked on every pass through loop(); the answer changes once an hour.
     unsigned long now = millis();
@@ -509,6 +546,10 @@ void SplitFlapWebServer::startWebServer() {
 
         doc["quiet_hours"] = this->inQuietHours();
 
+        long tempUntil = settings.getInt("tempUntil");
+        doc["temp_seconds_left"] =
+            (tempUntil > 0 && this->isClockSynced()) ? max(0L, tempUntil - (long) time(nullptr)) : 0;
+
         if (! this->isClockSynced()) {
             warn("warn", "Clock not synchronised yet; date and time modes are holding off");
         }
@@ -653,6 +694,11 @@ void SplitFlapWebServer::startWebServer() {
             response["message"] = "Settings updated successfully, Rebooting...";
         }
 
+        // Choosing a mode by hand means the temporary message is over.
+        if (json["mode"].is<int>()) {
+            settings.putInt("tempUntil", 0);
+        }
+
         response["type"] = "success";
         response["persistent"] = reconnect;
 
@@ -700,6 +746,16 @@ void SplitFlapWebServer::startWebServer() {
 
         this->setMultiDelay(delay * 1000);
         settings.putInt("multiDelay", (int) delay);
+
+        // An optional lifetime, in seconds. Recorded with the mode to go back
+        // to, captured before this request changes it.
+        int duration = json["duration"].is<int>() ? json["duration"].as<int>() : 0;
+        if (duration > 0 && isClockSynced()) {
+            settings.putInt("tempReturnMode", this->getMode());
+            settings.putInt("tempUntil", (int) (time(nullptr) + duration));
+        } else {
+            settings.putInt("tempUntil", 0);
+        }
         Serial.println("Delay: " + String(this->getMultiWordDelay()));
 
         centering = json["center"].as<bool>() ? 1 : 0;

@@ -54,7 +54,11 @@ JsonSettings settings = JsonSettings("config", {
     {"syncLanding", JsonSetting(1, 0, 1)},
     // Quiet hours: no automatic movement between these two hours. Equal means off.
     {"quietStart", JsonSetting(0, 0, 23)},
-    {"quietEnd", JsonSetting(0, 0, 23)}
+    {"quietEnd", JsonSetting(0, 0, 23)},
+    // A message with an expiry. Stored as an absolute time rather than a
+    // countdown so it still expires correctly across a restart.
+    {"tempUntil", JsonSetting(0, 0, 2147483647)},
+    {"tempReturnMode", JsonSetting(3, 0, 6)}
 });
 // clang-format on
 
@@ -101,6 +105,7 @@ void setup() {
         display.init();
         splitflapMqtt.setup();
         splitflapMqtt.setDisplay(&display);
+        splitflapMqtt.setWebServer(&webServer);
         display.setMqtt(&splitflapMqtt);
         webServer.setDisplay(&display);
 
@@ -120,6 +125,8 @@ void loop() {
     if (webServer.takeHomeRequest()) {
         display.home();
     }
+
+    webServer.checkTemporaryMessage();
 
     // Quiet hours silence the modes that move on their own. Text put there
     // deliberately, from the web page or over MQTT, still goes through: the
