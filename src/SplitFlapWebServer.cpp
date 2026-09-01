@@ -402,6 +402,11 @@ void SplitFlapWebServer::startWebServer() {
         doc["mode"] = this->getMode();
         doc["written"] = this->writtenString;
 
+        String broker = settings.getString("mqtt_server");
+        doc["mqtt_configured"] = broker.length() > 0;
+        doc["mqtt_broker"] = broker;
+        doc["mqtt_connected"] = display != nullptr && display->isMqttConnected();
+
         if (display != nullptr) {
             int stepsPerRot = display->getStepsPerRot();
             int charset = display->getCharsetSize();

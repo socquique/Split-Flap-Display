@@ -56,6 +56,9 @@ class SplitFlapDisplay {
     // else has to keep running - OTA, chiefly.
     void setIdleCallback(std::function<void()> callback) { idleCallback = callback; }
 
+    bool isMqttConnected() const; // reported by /diag, so the broker link can be
+                                  // checked without holding broker credentials
+
     void releaseMotorsNow(); // de-energize every coil immediately (OTA is starting)
 
     int getStepsPerRot() const { return stepsPerRot; }

@@ -467,6 +467,10 @@ void SplitFlapDisplay::releaseMotorsNow() {
     }
 }
 
+bool SplitFlapDisplay::isMqttConnected() const {
+    return mqtt != nullptr && const_cast<SplitFlapMqtt *>(mqtt)->isConnected();
+}
+
 void SplitFlapDisplay::setMqtt(SplitFlapMqtt *mqttHandler) {
     mqtt = mqttHandler;
 }
