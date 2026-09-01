@@ -4,6 +4,8 @@
 #include <sstream>
 
 String JsonSettings::getString(const char *key) {
+    Guard guard(mutex);
+
     preferences.begin(name, true);
     String value = preferences.getString(key, this->find(key).strDefault);
     preferences.end();
@@ -11,6 +13,8 @@ String JsonSettings::getString(const char *key) {
 }
 
 int JsonSettings::getInt(const char *key) {
+    Guard guard(mutex);
+
     preferences.begin(name, true);
     int value = preferences.getInt(key, this->find(key).intDefault);
     preferences.end();
@@ -18,6 +22,8 @@ int JsonSettings::getInt(const char *key) {
 }
 
 float JsonSettings::getFloat(const char *key) {
+    Guard guard(mutex);
+
     preferences.begin(name, true);
     float value = preferences.getFloat(key, this->find(key).floatDefault);
     preferences.end();
@@ -25,6 +31,8 @@ float JsonSettings::getFloat(const char *key) {
 }
 
 std::vector<int> JsonSettings::getIntVector(const char *key) {
+    Guard guard(mutex);
+
     preferences.begin(name, true);
     String value = preferences.getString(key, this->find(key).strDefault);
     preferences.end();
@@ -45,18 +53,24 @@ std::vector<int> JsonSettings::getIntVector(const char *key) {
 }
 
 void JsonSettings::putString(const char *key, String value) {
+    Guard guard(mutex);
+
     preferences.begin(name, false);
     preferences.putString(key, value);
     preferences.end();
 }
 
 void JsonSettings::putInt(const char *key, int value) {
+    Guard guard(mutex);
+
     preferences.begin(name, false);
     preferences.putInt(key, value);
     preferences.end();
 }
 
 void JsonSettings::putFloat(const char *key, float value) {
+    Guard guard(mutex);
+
     preferences.begin(name, false);
     preferences.putFloat(key, value);
     preferences.end();
@@ -74,6 +88,8 @@ void JsonSettings::putIntVector(const char *key, std::vector<int> value) {
 }
 
 JsonDocument JsonSettings::toJson() {
+    Guard guard(mutex);
+
     JsonDocument settings;
 
     preferences.begin(name, true);
@@ -99,6 +115,8 @@ JsonDocument JsonSettings::toJson() {
 }
 
 bool JsonSettings::fromJson(JsonDocument settings) {
+    Guard guard(mutex);
+
     preferences.begin(name, false);
 
     for (JsonPair kv : settings.as<JsonObject>()) {
@@ -138,6 +156,8 @@ bool JsonSettings::fromJson(JsonDocument settings) {
 }
 
 bool JsonSettings::reset() {
+    Guard guard(mutex);
+
     preferences.begin("config", false);
     preferences.clear();
     preferences.end();

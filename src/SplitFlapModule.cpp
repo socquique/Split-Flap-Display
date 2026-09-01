@@ -36,32 +36,35 @@ SplitFlapModule::SplitFlapModule(
     : address(I2Caddress), position(0), stepNumber(0), stepsPerRot(stepsPerFullRotation) {
     magnetPosition = magnetPos + stepOffset;
 
-    int len = charsetStr.length();
+    // The charset setting decides how many flaps the drum has; custom_charset
+    // only supplies the labels for them. Deriving the count from the length of
+    // a text field instead means a typo in that field silently redefines the
+    // geometry of the display - a 40 character string would turn a 48 flap drum
+    // into a 37 flap one and throw every character position off.
+    charSetSize = numChars = (charsetSize == 48) ? 48 : 37;
 
-    if (len < 37) {
-        // Use StandardChars as fallback
-        Serial.println("Fallback StandardChars");
-        charSetSize = numChars = 37;
-        usingCustomChars = false;
-        for (int i = 0; i < numChars; i++) {
-            customChars[i] = StandardChars[i];
-        }
-    } else if (len >= 37) {
-        // Use custom charset, but truncate to either 37 or 48
+    if ((int) charsetStr.length() == numChars) {
         usingCustomChars = true;
-        charSetSize = numChars = (len >= 48) ? 48 : 37;
         for (int i = 0; i < numChars; i++) {
             customChars[i] = charsetStr[i];
         }
-        customChars[numChars] = '\0';
     } else {
-        // Fallback if empty
-        charSetSize = numChars = 37;
         usingCustomChars = false;
+        const char *fallback = (numChars == 48) ? ExtendedChars : StandardChars;
         for (int i = 0; i < numChars; i++) {
-            customChars[i] = StandardChars[i];
+            customChars[i] = fallback[i];
+        }
+
+        if (charsetStr.length() > 0) {
+            Serial.print("custom_charset has ");
+            Serial.print(charsetStr.length());
+            Serial.print(" characters but charset is ");
+            Serial.print(numChars);
+            Serial.println(", falling back to the built-in set");
         }
     }
+
+    customChars[numChars] = '\0';
 }
 
 void SplitFlapModule::writeIO(uint16_t data) {
